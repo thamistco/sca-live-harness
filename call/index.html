@@ -983,7 +983,7 @@
   var DUMP_RE = /CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   function lineText(l) {
     var s = clean(l.text);
-    if (l.who !== "Patient") return s; s = s.replace(/(?:`{3}\s*(?:json|tool_code)?\s*)?(?:\bjson\s*)?(?:\\?(?:call:)?set_expression\s*\(?\s*)?\{\s*"?(?:expression|face)"?\s*:\s*"?[a-z_]+"?\s*\}\s*\)?(?:\s*`{3})?/gi, " ").replace(/`{3}\s*(?:json|tool_code)?/gi, " ");
+    if (l.who !== "Patient") return s; s = s.replace(/(?:`{3}\s*(?:json|tool_code)?\s*)?(?:\bjson\s*)?(?:\\?(?:call:)?set_expression\s*\(?\s*)?\{\s*"?(?:expression|face)"?\s*:\s*"?[a-z_]+"?\s*\}\s*\)?(?:\s*`{3})?/gi, " ").replace(/`{3}\s*(?:json|tool_code)?/gi, " ").replace(/\b[a-z]+_[a-z_]+\s*[:=]\s*["']?[\w.-]+["']?/gi, " ").replace(/-{3,}/g, " ");
     // Prompt dump: drop the sentence holding the marker and everything after it.
     var di = s.search(DUMP_RE);
     if (di >= 0) {
