@@ -32,13 +32,13 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
     if(m.error)res.errors.push(JSON.stringify(m.error).slice(0,400));
     var sc=m.serverContent;
     if(cur&&(sc||m.toolCall))cur.lastAt=Date.now();
-    if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text)cur.reply+=sc.outputTranscription.text;
+    if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text){cur.reply+=sc.outputTranscription.text;cur.lastOutAt=Date.now()}
       if(sc.inputTranscription&&sc.inputTranscription.text)cur.heard+=sc.inputTranscription.text;
-      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData)cur.audio_chunks++});
+      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData){cur.audio_chunks++;cur.lastOutAt=Date.now()}});
       ["finishReason","blockReason"].forEach(function(k){if(sc[k])cur.flags.push(k+":"+sc[k])});
       if(sc.interrupted)cur.flags.push("interrupted");
-      if(sc.turnComplete){cur.complete=true;cur.completes=(cur.completes||0)+1;cur.completeAt=Date.now();if(waiter){var w2=waiter;waiter=null;w2()}}}
-    if(m.toolCall&&m.toolCall.functionCalls){var r=m.toolCall.functionCalls.map(function(fc){if(cur)cur.tools.push(fc.name+"("+JSON.stringify(fc.args)+")");return{id:fc.id,name:fc.name,response:t.nonblocking?{result:"ok",scheduling:"SILENT"}:{result:"ok"}}});ws.send(JSON.stringify({toolResponse:{functionResponses:r}}))}
+      if(sc.turnComplete){cur.complete=true;cur.completes=(cur.completes||0)+1;cur.completeAt=Date.now();if(cur.toolAt&&cur.lastOutAt>cur.toolAt)cur.postToolDone=true;if(waiter){var w2=waiter;waiter=null;w2()}}}
+    if(m.toolCall&&m.toolCall.functionCalls){var r=m.toolCall.functionCalls.map(function(fc){if(cur)cur.tools.push(fc.name+"("+JSON.stringify(fc.args)+")");return{id:fc.id,name:fc.name,response:t.nonblocking?{result:"ok",scheduling:"SILENT"}:{result:"ok"}}});ws.send(JSON.stringify({toolResponse:{functionResponses:r}}));if(cur)cur.toolAt=Date.now()}
     if(m.goAway&&cur)cur.flags.push("goAway")};
   ws.onclose=function(ev){res.close={code:ev.code,reason:ev.reason};log(t.id+" closed "+ev.code+" "+ev.reason);if(waiter){var w=waiter;waiter=null;w()}finish()};
   ws.onerror=function(){res.errors.push("ws error")};
@@ -56,6 +56,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
         var sil=new Uint8Array(3200);for(var k=0;k<20;k++){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(sil),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
       } else ws.send(JSON.stringify({realtimeInput:{text:text}}));
       var r=await wait(45000);
+      for(var q=0;q<6&&!done&&cur.toolAt&&!cur.postToolDone;q++){r=await wait(15000)}
       // settle: keep waiting while output continues after a turnComplete (e.g. after a tool call)
       for(var g=0;g<20&&!done;g++){await sleep(2000); if(!(cur.lastAt>cur.completeAt)) break; cur.complete=false; r=await wait(30000);}
       cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout"); if(cur.completes>1)cur.flags.push("completes:"+cur.completes);
