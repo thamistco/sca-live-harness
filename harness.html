@@ -36,7 +36,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
     if(cur&&(sc||m.toolCall))cur.lastAt=Date.now();
     if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text){cur.reply+=sc.outputTranscription.text;cur.lastOutAt=Date.now()}
       if(sc.inputTranscription&&sc.inputTranscription.text)cur.heard+=sc.inputTranscription.text;
-      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData){cur.audio_chunks++;cur.lastOutAt=Date.now()}});
+      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData){cur.audio_chunks++;cur.lastOutAt=Date.now();if(!cur.firstAudioAt)cur.firstAudioAt=Date.now()}});
       ["finishReason","blockReason"].forEach(function(k){if(sc[k])cur.flags.push(k+":"+sc[k])});
       if(sc.interrupted)cur.flags.push("interrupted");
       if(sc.turnComplete){cur.complete=true;cur.completes=(cur.completes||0)+1;cur.completeAt=Date.now();if(cur.toolAt&&cur.lastOutAt>cur.toolAt)cur.postToolDone=true;if(waiter){var w2=waiter;waiter=null;w2()}}}
@@ -52,7 +52,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
       if(done)break;
       var turn=t.turns[i],text=typeof turn==="string"?turn:turn.text;
       cur={n:i+1,doctor:text,reply:"",heard:"",text_parts:"",audio_chunks:0,tools:[],flags:[],complete:false,ms:0};
-      res.turns.push(cur); var t0=Date.now();
+      res.turns.push(cur); var t0=Date.now(); cur.t0=t0;
       if(mode==="audio"&&turn.audio){var raw=Uint8Array.from(atob(turn.audio),function(c){return c.charCodeAt(0)});
         for(var o=0;o<raw.length;o+=3200){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(raw.subarray(o,o+3200)),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
         var sil=new Uint8Array(3200);for(var k=0;k<20;k++){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(sil),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
@@ -64,7 +64,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
       cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout"); if(cur.completes>1)cur.flags.push("completes:"+cur.completes);
       // let trailing transcription arrive
       await sleep(600);
-      log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms");
+      cur.first_audio_ms=cur.firstAudioAt?cur.firstAudioAt-t0:null; log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms first_audio="+cur.first_audio_ms+"ms");
       await sleep(400);
     }
     finish();
