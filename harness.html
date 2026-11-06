@@ -5,7 +5,7 @@
 <label>Model <input id="model" value="models/gemini-3.8-live" size="40"></label><br>
 <label>Tests file (.json) <input id="file" type="file" accept=".json,application/json"></label><br>
 <label>Input mode <select id="mode"><option value="text">text</option><option value="audio">audio (uses turn audio if present)</option></select></label><br>
-<button id="run">Run all tests</button> <span id="status">idle</span>
+<button id="run">Run all tests</button> <b>Status: <span id="status">idle</span></b>
 <h3>Log</h3><div id="log"></div>
 <h3>Results (JSON)</h3><textarea id="out" readonly></textarea>
 <h3>Summary</h3><pre id="summary"></pre>
@@ -25,19 +25,20 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
   var cur=null,waiter=null,done=false;
   function finish(){if(done)return;done=true;try{ws.close()}catch(e){}resolve(res)}
   ws.onopen=function(){var setup={model:model,generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:t.voice||"Kore"}}}},systemInstruction:{parts:[{text:t.system}]},inputAudioTranscription:{},outputAudioTranscription:{}};
-    if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[{name:"set_expression",description:"Change the patient's visible facial expression",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}}]}];
+    if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[Object.assign(t.nonblocking?{behavior:"NON_BLOCKING"}:{},{name:"set_expression",description:"Change the patient's visible facial expression",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}})]}];
     ws.send(JSON.stringify({setup:setup}))};
   ws.onmessage=function(ev){var txt=typeof ev.data==="string"?ev.data:new TextDecoder().decode(ev.data),m;try{m=JSON.parse(txt)}catch(e){return}
     if(m.setupComplete){res.setup_ok=true;if(waiter){var w=waiter;waiter=null;w()}}
     if(m.error)res.errors.push(JSON.stringify(m.error).slice(0,400));
     var sc=m.serverContent;
+    if(cur&&(sc||m.toolCall))cur.lastAt=Date.now();
     if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text)cur.reply+=sc.outputTranscription.text;
       if(sc.inputTranscription&&sc.inputTranscription.text)cur.heard+=sc.inputTranscription.text;
       if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData)cur.audio_chunks++});
       ["finishReason","blockReason"].forEach(function(k){if(sc[k])cur.flags.push(k+":"+sc[k])});
       if(sc.interrupted)cur.flags.push("interrupted");
-      if(sc.turnComplete){cur.complete=true;if(waiter){var w2=waiter;waiter=null;w2()}}}
-    if(m.toolCall&&m.toolCall.functionCalls){var r=m.toolCall.functionCalls.map(function(fc){if(cur)cur.tools.push(fc.name+"("+JSON.stringify(fc.args)+")");return{id:fc.id,name:fc.name,response:{result:"ok"}}});ws.send(JSON.stringify({toolResponse:{functionResponses:r}}))}
+      if(sc.turnComplete){cur.complete=true;cur.completes=(cur.completes||0)+1;cur.completeAt=Date.now();if(waiter){var w2=waiter;waiter=null;w2()}}}
+    if(m.toolCall&&m.toolCall.functionCalls){var r=m.toolCall.functionCalls.map(function(fc){if(cur)cur.tools.push(fc.name+"("+JSON.stringify(fc.args)+")");return{id:fc.id,name:fc.name,response:t.nonblocking?{result:"ok",scheduling:"SILENT"}:{result:"ok"}}});ws.send(JSON.stringify({toolResponse:{functionResponses:r}}))}
     if(m.goAway&&cur)cur.flags.push("goAway")};
   ws.onclose=function(ev){res.close={code:ev.code,reason:ev.reason};log(t.id+" closed "+ev.code+" "+ev.reason);if(waiter){var w=waiter;waiter=null;w()}finish()};
   ws.onerror=function(){res.errors.push("ws error")};
@@ -54,7 +55,10 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
         for(var o=0;o<raw.length;o+=3200){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(raw.subarray(o,o+3200)),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
         var sil=new Uint8Array(3200);for(var k=0;k<20;k++){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(sil),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
       } else ws.send(JSON.stringify({realtimeInput:{text:text}}));
-      var r=await wait(45000); cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout");
+      var r=await wait(45000);
+      // settle: keep waiting while output continues after a turnComplete (e.g. after a tool call)
+      for(var g=0;g<20&&!done;g++){await sleep(2000); if(!(cur.lastAt>cur.completeAt)) break; cur.complete=false; r=await wait(30000);}
+      cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout"); if(cur.completes>1)cur.flags.push("completes:"+cur.completes);
       // let trailing transcription arrive
       await sleep(600);
       log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms");
@@ -67,10 +71,11 @@ $("run").addEventListener("click",async function(){
   var key=$("key").value.trim(),model=$("model").value.trim(),mode=$("mode").value;
   if(!key||!TESTS){log("Need key and tests file");return}
   $("status").textContent="running"; var all=[];
-  for(var i=0;i<TESTS.length;i++){log("Starting "+TESTS[i].id);var r=await runTest(TESTS[i],key,model,mode);all.push(r);
-    $("out").value=JSON.stringify(all,null,1);$("readable").textContent=all.map(function(r){return "=== "+r.id+" setup="+r.setup_ok+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.join("; ")+"\n"+r.turns.map(function(t){return "T"+t.n+" DR: "+t.doctor+(t.heard?"\n   [heard: "+t.heard+"]":"")+"\n   PT: "+(t.reply||t.text_parts||"(no transcript)")+(t.tools.length?"\n   TOOLS: "+t.tools.join(", "):"")+(t.flags.length?"\n   FLAGS: "+t.flags.join(", "):"")+" ("+t.ms+"ms"+(t.complete?"":", INCOMPLETE")+")"}).join("\n")}).join("\n\n");await sleep(1500)}
+  for(var i=0;i<TESTS.length;i++){log("Starting "+TESTS[i].id);$("status").textContent="running test "+(i+1)+" of "+TESTS.length+" ("+TESTS[i].id+")";var r=await runTest(TESTS[i],key,model,mode);all.push(r);
+    $("out").value=JSON.stringify(all,null,1);renderReadable(all);await sleep(1500)}
+  function renderReadable(all){$("readable").textContent=all.map(function(r){return "=== "+r.id+" setup="+r.setup_ok+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.join("; ")+"\n"+r.turns.map(function(t){return "T"+t.n+" DR: "+t.doctor+(t.heard?"\n   [heard: "+t.heard+"]":"")+"\n   PT: "+(t.reply||t.text_parts||"(no transcript)")+(t.tools.length?"\n   TOOLS: "+t.tools.join(", "):"")+(t.flags.length?"\n   FLAGS: "+t.flags.join(", "):"")+" ("+t.ms+"ms"+(t.complete?"":", INCOMPLETE")+")"}).join("\n")}).join("\n\n");}
   var sum=all.map(function(r){var inc=r.turns.filter(function(t){return!t.complete}).length;return r.id+": setup="+r.setup_ok+" turns="+r.turns.length+" incomplete="+inc+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.length}).join("\n");
-  $("summary").textContent=sum+"\nALL DONE"; $("status").textContent="done"; log("ALL DONE");
+  $("summary").textContent=sum+"\nALL DONE"; renderReadable(all); $("status").textContent="done"; log("ALL DONE");
 });
 })();
 </script></body></html>
