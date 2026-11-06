@@ -15,6 +15,8 @@
 var WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=";
 var $=function(i){return document.getElementById(i)};
 var TESTS=null;
+window.addEventListener("load",function(){try{var s=JSON.parse(localStorage.getItem("scaHarnessLast")||"null");if(s){$("prev").textContent="Previous run saved at "+s.at+" ("+s.all.length+" tests):";renderReadable2(s.all,"prevtx")}}catch(e){}});
+function renderReadable2(all,id){document.getElementById(id).textContent=all.map(function(r){return "=== "+r.id+" close="+(r.close?r.close.code:"-")+"\n"+r.turns.map(function(t){return "T"+t.n+" DR: "+t.doctor+"\n   PT: "+(t.reply||"(no transcript)")+(t.tools.length?"\n   TOOLS: "+t.tools.join(", "):"")+(t.flags.length?"\n   FLAGS: "+t.flags.join(", "):"")}).join("\n")}).join("\n\n")}
 function log(s){$("log").textContent+=new Date().toISOString().slice(11,19)+" "+s+"\n";$("log").scrollTop=1e9}
 $("file").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;f.text().then(function(t){try{TESTS=JSON.parse(t);log("Loaded "+TESTS.length+" tests")}catch(err){log("Bad JSON: "+err)}})});
 function b64(u8){var s="";for(var i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s)}
@@ -73,10 +75,11 @@ $("run").addEventListener("click",async function(){
   if(!key||!TESTS){log("Need key and tests file");return}
   $("status").textContent="running"; var all=[];
   for(var i=0;i<TESTS.length;i++){log("Starting "+TESTS[i].id);$("status").textContent="running test "+(i+1)+" of "+TESTS.length+" ("+TESTS[i].id+")";var r=await runTest(TESTS[i],key,model,mode);all.push(r);
-    $("out").value=JSON.stringify(all,null,1);renderReadable(all);await sleep(1500)}
+    $("out").value=JSON.stringify(all,null,1);renderReadable(all);try{localStorage.setItem("scaHarnessLast",JSON.stringify({at:new Date().toISOString(),all:all}))}catch(e){}await sleep(1500)}
   function renderReadable(all){$("readable").textContent=all.map(function(r){return "=== "+r.id+" setup="+r.setup_ok+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.join("; ")+"\n"+r.turns.map(function(t){return "T"+t.n+" DR: "+t.doctor+(t.heard?"\n   [heard: "+t.heard+"]":"")+"\n   PT: "+(t.reply||t.text_parts||"(no transcript)")+(t.tools.length?"\n   TOOLS: "+t.tools.join(", "):"")+(t.flags.length?"\n   FLAGS: "+t.flags.join(", "):"")+" ("+t.ms+"ms"+(t.complete?"":", INCOMPLETE")+")"}).join("\n")}).join("\n\n");}
   var sum=all.map(function(r){var inc=r.turns.filter(function(t){return!t.complete}).length;return r.id+": setup="+r.setup_ok+" turns="+r.turns.length+" incomplete="+inc+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.length}).join("\n");
   $("summary").textContent=sum+"\nALL DONE"; renderReadable(all); $("status").textContent="done"; log("ALL DONE");
 });
 })();
-</script></body></html>
+</script>
+<h3 id="prev">No previous run saved</h3><pre id="prevtx" style="white-space:pre-wrap"></pre></body></html>
