@@ -772,7 +772,7 @@
     var c = S.c;
     var setup = {
       model: model,
-      generationConfig: { responseModalities: ["AUDIO"], thinkingConfig: { thinkingBudget: 0 }, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: S.voice } } } },
+      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: S.voice } } } },
       systemInstruction: { parts: [{ text: decodeP(c.p) }] },
       inputAudioTranscription: {},
       outputAudioTranscription: {}

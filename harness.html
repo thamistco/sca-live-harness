@@ -26,7 +26,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
   var ws=new WebSocket(WS+encodeURIComponent(key)); ws.binaryType="arraybuffer";
   var cur=null,waiter=null,done=false;
   function finish(){if(done)return;done=true;try{ws.close()}catch(e){}resolve(res)}
-  ws.onopen=function(){var setup={model:model,generationConfig:{responseModalities:["AUDIO"],thinkingConfig:{thinkingBudget:0},speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:t.voice||"Kore"}}}},systemInstruction:{parts:[{text:t.system}]},inputAudioTranscription:{},outputAudioTranscription:{}};
+  ws.onopen=function(){var setup={model:model,generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:t.voice||"Kore"}}}},systemInstruction:{parts:[{text:t.system}]},inputAudioTranscription:{},outputAudioTranscription:{}};var _tl=new URLSearchParams(location.search).get("think");if(_tl){setup.generationConfig.thinkingConfig={thinkingLevel:_tl};}
     if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[Object.assign(t.nonblocking?{behavior:"NON_BLOCKING"}:{},{name:"set_expression",description:"Silently sets the patient's face on screen. Call it; never speak, write or describe it.",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}})]}];
     ws.send(JSON.stringify({setup:setup}))};
   ws.onmessage=function(ev){var txt=typeof ev.data==="string"?ev.data:new TextDecoder().decode(ev.data),m;try{m=JSON.parse(txt)}catch(e){return}
