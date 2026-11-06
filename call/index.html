@@ -809,11 +809,19 @@
     var sc = m.serverContent;
     if (sc) {
       if (sc.interrupted) stopPlayback();
-      if (sc.modelTurn && sc.modelTurn.parts) sc.modelTurn.parts.forEach(function (p) {
+      if (sc.inputTranscription && sc.inputTranscription.text) addTx("Doctor", sc.inputTranscription.text);
+      if (sc.outputTranscription && sc.outputTranscription.text) {
+        addTx("Patient", sc.outputTranscription.text);
+        // Live audio guard: mute the rest of a turn whose transcription leaks prompt/thoughts/tool syntax.
+        S.turnTx = (S.turnTx || "") + sc.outputTranscription.text;
+        if (!S.muteTurn && (LEAK_RE.test(S.turnTx) || GARBAGE_RE.test(S.turnTx))) {
+          S.muteTurn = true; stopPlayback(); console.warn("leak suppressed");
+        }
+      }
+      if (sc.modelTurn && sc.modelTurn.parts && !S.muteTurn) sc.modelTurn.parts.forEach(function (p) {
         if (p.inlineData && p.inlineData.data && /audio/.test(p.inlineData.mimeType || "audio")) playPcm(p.inlineData.data);
       });
-      if (sc.inputTranscription && sc.inputTranscription.text) addTx("Doctor", sc.inputTranscription.text);
-      if (sc.outputTranscription && sc.outputTranscription.text) addTx("Patient", sc.outputTranscription.text);
+      if (sc.turnComplete || sc.interrupted) { S.turnTx = ""; S.muteTurn = false; }
     }
     if (m.toolCall && m.toolCall.functionCalls) {
       var responses = m.toolCall.functionCalls.map(function (fc) {
@@ -885,7 +893,7 @@
 
   /* Playback */
   function playPcm(b64) {
-    var out = A.out; if (!out) return;
+    var out = A.out; if (!out || S.muteTurn) return;
     var bin = atob(b64), n = bin.length >> 1, buf = out.createBuffer(1, n, 24000), d = buf.getChannelData(0);
     for (var i = 0; i < n; i++) { var v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 32768) v -= 65536; d[i] = v / 32768; }
     var src = out.createBufferSource(); src.buffer = buf; src.connect(A.analyser);
@@ -939,24 +947,55 @@
   function clean(s) { return s.replace(/\s+/g, " ").trim(); }
   var DISCLAIMER_RE = /not (intended as )?medical advice|not medical advice or diagnosis|seek (medical )?care|please (see|consult) a (healthcare|medical) professional|consult a healthcare professional|as an AI|educational purposes|medical advice (or|and) diagnosis (is|are) not provided|seek care from a (healthcare|health care|medical) professional/i;
   var SENT_RE = /[^.!?]+(?:[.!?]+["')\u201d\u2019]*|$)/g;
+  var DOT = "\u2024", DOT_RE = /\u2024/g;
+  var GARBAGE_RE = /```|`[^`]+`|\\[a-zA-Z]+\{|\bEOF\b|\.(py|sh|js|ts|json)\b|\b\w+_\w+\(|__\w+__|\btool\b.*\b(edit|run|call)|run_tests|\bbash\b/;
+  var LEAK_RE = /thought The user|\bthe user (asked|said|is asking)\b|according to (the|my) instructions|maintaining my character|\bin character\b|CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|ONE ITEM AT A TIME|RELEASED HIDDEN AGENDA|hidden_agenda|only_if_asked|freely_given|opening_statement|release_when|release_rule|responds_to_(good|poor)|closing_behaviour|emotional_state|set_expression|\\call:|"persona"\s*:|\{"[a-z_]+"\s*:/i;
+  var DUMP_RE = /CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   function lineText(l) {
     var s = clean(l.text);
     if (l.who !== "Patient") return s;
+    // Prompt dump: drop the sentence holding the marker and everything after it.
+    var di = s.search(DUMP_RE);
+    if (di >= 0) {
+      var head = s.slice(0, di), cut = -1, m, END_RE = /[!?]+["')\u201d\u2019]*|\.+["')\u201d\u2019]*(?!\d)/g;
+      while ((m = END_RE.exec(head))) cut = m.index + m[0].length;
+      s = cut > 0 ? head.slice(0, cut) : "";
+    }
     s = s.replace(/<no speech>/gi, " ").replace(/\{pause\}/gi, " ")
       .replace(/<[^\s<>]{1,20}>|\{[^\s{}]{1,20}\}/g, " ");
-    s = clean(s).replace(/([a-z0-9][.!?]+["')\u201d\u2019]*)(?=[A-Z])/g, "$1 ");
-    var prev = null;
-    return (s.match(SENT_RE) || [s])
-      .map(function (x) { return x.trim(); })
-      .filter(function (x) {
-        if (!x || DISCLAIMER_RE.test(x)) return false;
-        var k = x.toLowerCase();
-        if (k === prev) return false;
-        prev = k;
-        return true;
-      })
-      .join(" ").trim();
+    // Protect decimals/times ("3.30 pm", "4.5 mg") before splitting.
+    s = clean(s).replace(/(\d)\.(?=\d)/g, "$1" + DOT);
+    // Insert a missing space after sentence end (capital after, so never between digits).
+    s = s.replace(/([a-z0-9][.!?]+["')\u201d\u2019]*)(?=[A-Z])/g, "$1 ");
+    // Protect in-token periods (file.py, ./path, e.g.) so they don't split.
+    s = s.replace(/\.(?=[^\s.!?"')\u201d\u2019])/g, DOT);
+    var sents = (s.match(SENT_RE) || [s])
+      .map(function (x) { return x.trim().replace(DOT_RE, "."); })
+      .filter(function (x) { return x && !DISCLAIMER_RE.test(x) && !GARBAGE_RE.test(x) && !LEAK_RE.test(x); });
+    var keys = sents.map(function (x) { return x.toLowerCase().replace(/\s+/g, " "); });
+    var seen = {}, drop = [];
+    keys.forEach(function (k, i) { drop[i] = k.length > 15 && seen[k] === 1; seen[k] = 1; });
+    // Short sentences: drop an immediate repeat, or one that is part of a repeated block.
+    seen = {};
+    keys.forEach(function (k, i) {
+      if (k.length <= 15) {
+        drop[i] = (i > 0 && keys[i - 1] === k) ||
+          (seen[k] === 1 && ((i + 1 < keys.length && drop[i + 1] && keys[i + 1].length > 15) || (i > 0 && drop[i - 1])));
+      }
+      seen[k] = 1;
+    });
+    return sents.filter(function (x, i) { return !drop[i]; }).join(" ").trim();
   }
+  /* Self-test (checked with node during build):
+     "about 12 noon, 3.30 pm, 7 pm and 10.30 pm yesterday." -> unchanged
+     "I'm worried. I can't afford it.I'm worried. I can't afford it." -> "I'm worried. I can't afford it."
+     "I can walk into town fine. \end{document} EOF ``` ... `src/pydantic_partial/parser.py`... No swelling."
+       -> "I can walk into town fine. No swelling."
+     Leak (a) "...that's it for now.thought The user asked ... maintaining my character as Nadia.No, I think that's it for now."
+       -> "No, I think that's it for now."
+     Leak (b) "... Heart doesn't race. - Speak ONLY as the character ... {"persona":"Albert"}" -> "... Heart doesn't race."
+     Leak (c) "\call:set_expression{expression:Low most days ... I don't enjoy anything, even weekends."
+       -> keeps "I don't enjoy anything, even weekends." */
   function txLines() { return S.tx.filter(function (l) { return lineText(l); }); }
   function transcriptLines() {
     return txLines().map(function (l) { return "[" + l.t + "] " + l.who + ": " + lineText(l); });
