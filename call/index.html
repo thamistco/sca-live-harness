@@ -992,6 +992,7 @@
       s = cut > 0 ? head.slice(0, cut) : "";
     }
     s = s.replace(/\\?(?:call:)?set_expression\s*\(?\s*\{[^{}]{0,60}\}\s*\)?/gi, " ");
+    s = s.replace(/[\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF\u3000-\u303F]+/g, " ");
     s = s.replace(/<no speech>/gi, " ").replace(/\{pause\}/gi, " ")
       .replace(/<[^<>]{1,30}>|\{[^{}]{1,30}\}/g, " ").replace(/\*\*|`/g, "");
     // Protect decimals/times ("3.30 pm", "4.5 mg") before splitting.
