@@ -213,7 +213,7 @@
           <div class="x-group">
             <label class="x-label" for="key">Gemini API key</label>
             <input class="x-input" id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key" />
-            <label class="x-check"><input type="checkbox" id="remember" /> Remember on this device</label>
+            <label class="x-check"><input type="checkbox" id="remember" checked /> Remember on this device</label>
             <p class="fineprint">Free key from <a class="link" href="https://aistudio.google.com" target="_blank" rel="noopener">aistudio.google.com</a>. It stays in this browser and is sent only to Google.</p>
             <p class="x-error" id="key-err" role="alert" hidden>Enter your Gemini API key to continue.</p>
           </div>
@@ -775,7 +775,7 @@
       outputAudioTranscription: {}
     };
     if (c.mode !== "telephone" && c.expressions && c.expressions.length) {
-      setup.tools = [{ functionDeclarations: [{ name: "set_expression", description: "Change the patient's visible facial expression",
+      setup.tools = [{ functionDeclarations: [{ name: "set_expression", description: "Silently sets the patient's face. Never mention or speak this call.",
         parameters: { type: "OBJECT", properties: { expression: { type: "STRING", enum: c.expressions } }, required: ["expression"] } }] }];
     }
     return JSON.stringify({ setup: setup });
