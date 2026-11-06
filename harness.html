@@ -27,7 +27,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
   var cur=null,waiter=null,done=false;
   function finish(){if(done)return;done=true;try{ws.close()}catch(e){}resolve(res)}
   ws.onopen=function(){var setup={model:model,generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:t.voice||"Kore"}}}},systemInstruction:{parts:[{text:t.system}]},inputAudioTranscription:{},outputAudioTranscription:{}};
-    if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[Object.assign(t.nonblocking?{behavior:"NON_BLOCKING"}:{},{name:"set_expression",description:"Change the patient's visible facial expression",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}})]}];
+    if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[Object.assign(t.nonblocking?{behavior:"NON_BLOCKING"}:{},{name:"set_expression",description:"Silently sets the patient's face on screen. Call it; never speak, write or describe it.",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}})]}];
     ws.send(JSON.stringify({setup:setup}))};
   ws.onmessage=function(ev){var txt=typeof ev.data==="string"?ev.data:new TextDecoder().decode(ev.data),m;try{m=JSON.parse(txt)}catch(e){return}
     if(m.setupComplete){res.setup_ok=true;if(waiter){var w=waiter;waiter=null;w()}}
