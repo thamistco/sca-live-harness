@@ -9,6 +9,7 @@
 <h3>Log</h3><div id="log"></div>
 <h3>Results (JSON)</h3><textarea id="out" readonly></textarea>
 <h3>Summary</h3><pre id="summary"></pre>
+<h3>Readable transcript</h3><pre id="readable" style="white-space:pre-wrap"></pre>
 <script>
 (function(){
 var WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=";
@@ -67,7 +68,7 @@ $("run").addEventListener("click",async function(){
   if(!key||!TESTS){log("Need key and tests file");return}
   $("status").textContent="running"; var all=[];
   for(var i=0;i<TESTS.length;i++){log("Starting "+TESTS[i].id);var r=await runTest(TESTS[i],key,model,mode);all.push(r);
-    $("out").value=JSON.stringify(all,null,1);await sleep(1500)}
+    $("out").value=JSON.stringify(all,null,1);$("readable").textContent=all.map(function(r){return "=== "+r.id+" setup="+r.setup_ok+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.join("; ")+"\n"+r.turns.map(function(t){return "T"+t.n+" DR: "+t.doctor+(t.heard?"\n   [heard: "+t.heard+"]":"")+"\n   PT: "+(t.reply||t.text_parts||"(no transcript)")+(t.tools.length?"\n   TOOLS: "+t.tools.join(", "):"")+(t.flags.length?"\n   FLAGS: "+t.flags.join(", "):"")+" ("+t.ms+"ms"+(t.complete?"":", INCOMPLETE")+")"}).join("\n")}).join("\n\n");await sleep(1500)}
   var sum=all.map(function(r){var inc=r.turns.filter(function(t){return!t.complete}).length;return r.id+": setup="+r.setup_ok+" turns="+r.turns.length+" incomplete="+inc+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.length}).join("\n");
   $("summary").textContent=sum+"\nALL DONE"; $("status").textContent="done"; log("ALL DONE");
 });
