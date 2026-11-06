@@ -772,7 +772,7 @@
     var c = S.c;
     var setup = {
       model: model,
-      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: S.voice } } } },
+      generationConfig: { responseModalities: ["AUDIO"], thinkingConfig: { thinkingBudget: 0 }, speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: S.voice } } } },
       systemInstruction: { parts: [{ text: decodeP(c.p) }] },
       inputAudioTranscription: {},
       outputAudioTranscription: {}
@@ -992,7 +992,7 @@
       s = cut > 0 ? head.slice(0, cut) : "";
     }
     s = s.replace(/<no speech>/gi, " ").replace(/\{pause\}/gi, " ")
-      .replace(/<[^\s<>]{1,20}>|\{[^\s{}]{1,20}\}/g, " ");
+      .replace(/<[^<>]{1,30}>|\{[^{}]{1,30}\}/g, " ").replace(/\*\*|`/g, "");
     // Protect decimals/times ("3.30 pm", "4.5 mg") before splitting.
     s = clean(s).replace(/(\d)\.(?=\d)/g, "$1" + DOT);
     // Insert a missing space after sentence end (capital after, so never between digits).
