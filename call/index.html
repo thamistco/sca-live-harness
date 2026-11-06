@@ -975,7 +975,7 @@
     return hit / x.length >= 0.8;
   }
   function clean(s) { return s.replace(/\s+/g, " ").trim(); }
-  var DISCLAIMER_RE = /not (intended as )?medical advice|not medical advice or diagnosis|seek (medical )?care|please (see|consult) a (healthcare|medical) professional|consult a healthcare professional|as an AI|educational purposes|medical advice (or|and) diagnosis (is|are) not provided|seek care from a (healthcare|health care|medical) professional/i;
+  var DISCLAIMER_RE = /please note that this|not (intended as )?(medical|professional) advice|not medical advice or diagnosis|seek (medical )?care|please (see|consult) a (healthcare|medical) professional|consult a healthcare professional|as an AI|educational purposes|medical advice (or|and) diagnosis (is|are) not provided|seek care from a (healthcare|health care|medical) professional/i;
   var SENT_RE = /[^.!?]+(?:[.!?]+["')\u201d\u2019]*|$)/g;
   var DOT = "\u2024", DOT_RE = /\u2024/g;
   var GARBAGE_RE = /```|`[^`]+`|\\[a-zA-Z]+\{|\bEOF\b|\.(py|sh|js|ts|json)\b|\b\w+_\w+\(|__\w+__|\btool\b.*\b(edit|run|call)|run_tests|\bbash\b/;
