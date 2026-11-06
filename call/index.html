@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SCA Live Call</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400&display=swap"
+    />
+    <link rel="stylesheet" href="hark.css" />
+    <link rel="stylesheet" href="hark-hero.css" />
+    <style>
+      [hidden] { display: none !important; }
+      .x-app { max-width: 560px; padding-block: calc(env(safe-area-inset-top, 0px) + 20px) 48px; }
+      .x-screen { display: grid; gap: 24px; }
+      .x-title { display: grid; gap: 6px; }
+      .x-title h1 { font: var(--type-display); overflow-wrap: anywhere; }
+      .x-title .x-eyebrow { font: var(--type-label); color: var(--text-secondary); }
+      .x-title .x-lede { color: var(--text-secondary); font-size: var(--size-body); }
+      .x-group { display: grid; gap: 10px; padding-top: 20px; border-top: 1px solid var(--stroke-secondary); }
+      .x-group > h2 { font: var(--type-heading); }
+      .x-label { font: var(--type-label); }
+      .x-input, .x-select {
+        width: 100%; min-height: 48px; padding: 10px 14px;
+        border: 1px solid var(--stroke-primary); border-radius: var(--r-s);
+        background: var(--fill-primary-on); color: var(--text-primary); font: var(--type-body);
+      }
+      .x-check { display: flex; align-items: center; gap: 10px; min-height: var(--tap); font: var(--type-body); cursor: pointer; }
+      .x-check input, .x-case input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--fill-primary); }
+      .x-error { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font: var(--type-label); }
+      .x-error::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fill-system-red); flex: none; }
+      .x-picked { font: var(--type-small); color: var(--text-secondary); }
+      .x-cases {
+        max-height: 46vh; overflow-y: auto; overscroll-behavior: contain;
+        border: 1px solid var(--stroke-primary); border-radius: var(--r-m);
+      }
+      .x-case {
+        display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px;
+        border-bottom: 1px solid var(--stroke-secondary); cursor: pointer; font: var(--type-small);
+      }
+      .x-case:last-child { border-bottom: 0; }
+      .x-case:has(input:checked) { background: var(--fill-tertiary); }
+      .x-case__t { flex: 1; min-width: 0; }
+      .x-case .chip { flex: none; }
+      .x-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      .x-cta {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        min-height: 52px; padding: 0 24px; border: 0; border-radius: var(--r-pill);
+        background: var(--fill-primary); color: var(--text-primary-on); font: var(--type-body-strong);
+        cursor: pointer; text-decoration: none; transition: transform var(--dur-quick) var(--ease-out);
+      }
+      .x-cta:active { transform: scale(0.97); }
+      .x-cta--wide { width: 100%; }
+      .x-ghost {
+        display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 16px;
+        border: 1px solid var(--stroke-primary); border-radius: var(--r-pill); background: var(--fill-primary-on);
+        color: var(--text-primary); font: var(--type-label); cursor: pointer;
+      }
+      .x-ghost:hover, .x-case:hover { box-shadow: inset 0 0 0 100px var(--hover-wash); }
+
+      /* Case notes */
+      .x-readbar {
+        position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); z-index: 5;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 10px 10px 10px 18px; border-radius: var(--r-pill);
+        background: var(--mat-agent); -webkit-backdrop-filter: var(--hark-blur); backdrop-filter: var(--hark-blur);
+        border: 1px solid var(--stroke-primary); box-shadow: var(--hark-shadow);
+      }
+      .x-readbar__t { display: grid; }
+      .x-readbar__t small { font: var(--type-caption); color: var(--text-secondary); }
+      .x-clock { font: var(--weight-medium) 24px/1.1 "Geist Mono", monospace; font-variant-numeric: tabular-nums; }
+      .x-readbar.is-over .x-clock { font: var(--type-label); color: var(--fill-system-red); }
+      .x-brief { display: grid; gap: 0; }
+      .x-bsec { display: grid; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--stroke-secondary); }
+      .x-bsec:last-child { border-bottom: 0; }
+      .x-bsec > h3 { font: var(--type-tag); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+      .x-bsec ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+      .x-kv { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; }
+      .x-kv dt { color: var(--text-secondary); }
+      .x-kv dd { margin: 0; font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+      .x-none { color: var(--text-secondary); }
+
+      /* Call */
+      .x-call {
+        position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+        background: var(--hero-surface); color: var(--hero-text);
+        padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+      }
+      .x-call :focus-visible { outline-color: var(--hero-text); }
+      .x-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; }
+      .x-top__case { min-width: 0; font: var(--type-small); color: var(--hero-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .x-status { display: flex; align-items: center; gap: 6px; font: var(--type-tag); }
+      .x-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fill-system-orange); flex: none; }
+      .x-status[data-state="live"]::before { background: var(--fill-system-green); }
+      .x-status[data-state="error"]::before, .x-status[data-state="lost"]::before { background: var(--fill-system-red); }
+      .x-timer { font: var(--weight-medium) 22px/1 "Geist Mono", monospace; font-variant-numeric: tabular-nums; padding: 8px 12px; border-radius: var(--r-pill); background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke); }
+      .x-timer.is-low { background: var(--fill-system-red); border-color: transparent; }
+      .x-closeinfo { font: var(--type-caption); font-family: "Geist Mono", monospace; color: var(--hero-text-muted); overflow-wrap: anywhere; }
+      .x-blockbar { margin: 0 16px 6px; padding: 6px 12px; border-radius: var(--r-m); background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke); color: var(--hero-text); font: var(--type-tag); text-align: center; }
+      .x-warnbar { margin: 0 16px 6px; padding: 6px 12px; border-radius: var(--r-pill); background: var(--fill-system-red); color: var(--hero-text); font: var(--type-tag); text-align: center; }
+      .x-stage { position: relative; min-height: 0; margin: 0 8px; border-radius: var(--r-l); overflow: hidden; --lvl: 0; }
+      .x-facewrap { position: absolute; inset: 0; border-radius: var(--r-l); overflow: hidden; transition: transform 120ms linear, box-shadow 200ms ease; }
+      .x-facewrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: 0; transition: opacity 300ms ease; }
+      .x-facewrap img.is-on { opacity: 1; }
+      .x-stage.is-speaking .x-facewrap {
+        transform: scale(calc(1.005 + var(--lvl) * 0.025));
+        box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--fill-system-green) 80%, transparent), inset 0 0 calc(20px + var(--lvl) * 40px) color-mix(in srgb, var(--fill-system-green) 45%, transparent);
+      }
+      .x-phone { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 16px; }
+      .x-avatar {
+        width: 168px; height: 168px; border-radius: 50%; display: grid; place-items: center;
+        background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke);
+        font: var(--weight-medium) 56px/1 var(--sans); letter-spacing: 0.02em;
+        transition: box-shadow 120ms linear, transform 120ms linear;
+      }
+      .x-stage.is-speaking .x-avatar {
+        transform: scale(calc(1 + var(--lvl) * 0.06));
+        box-shadow: 0 0 0 calc(6px + var(--lvl) * 22px) color-mix(in srgb, var(--fill-system-green) 30%, transparent);
+      }
+      .x-phone__name { font: var(--type-heading); }
+      .x-phone__label { font: var(--type-small); color: var(--hero-text-muted); }
+      .x-bars { display: flex; align-items: center; gap: 5px; height: 36px; }
+      .x-bars span { width: 6px; height: 100%; border-radius: 3px; background: var(--hero-text); opacity: 0.35; transform: scaleY(0.15); transition: transform 90ms linear, opacity 120ms; }
+      .x-stage.is-speaking .x-bars span { opacity: 0.9; }
+      .x-self {
+        position: absolute; right: 12px; bottom: 12px; width: 96px; height: 128px; z-index: 3;
+        border-radius: var(--r-s); overflow: hidden; background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke);
+        box-shadow: var(--hark-shadow); touch-action: none; cursor: grab;
+      }
+      .x-self video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+      .x-msg {
+        position: absolute; inset: auto 12px 12px; z-index: 4; display: grid; gap: 12px; padding: 16px 18px;
+        border-radius: var(--r-l); background: var(--hero-glass); -webkit-backdrop-filter: var(--hark-blur); backdrop-filter: var(--hark-blur);
+        border: 1px solid var(--hero-glass-stroke); font: var(--type-body);
+      }
+      .x-msg .x-row button { min-height: var(--tap); padding: 0 18px; border-radius: var(--r-pill); border: 1px solid var(--hero-glass-stroke); background: var(--hero-text); color: var(--hero-surface); font: var(--type-label); cursor: pointer; }
+      .x-msg .x-row button + button { background: transparent; color: var(--hero-text); }
+      .x-tx {
+        position: absolute; inset: auto 0 0 0; z-index: 2; max-height: 55%; overflow-y: auto; padding: 14px 16px;
+        background: var(--hero-scrim-strong); -webkit-backdrop-filter: var(--hark-blur); backdrop-filter: var(--hark-blur);
+        font: var(--type-small); display: grid; gap: 8px; align-content: start;
+      }
+      .x-tx p span { font: var(--type-caption); color: var(--hero-text-muted); margin-right: 6px; font-family: "Geist Mono", monospace; }
+      .x-tx .x-none { color: var(--hero-text-muted); }
+      .x-banner {
+        position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5;
+        padding: 16px 24px; border-radius: var(--r-l); background: var(--fill-system-red); color: var(--hero-text);
+        font: var(--type-heading); box-shadow: var(--hark-shadow); white-space: nowrap;
+      }
+      .x-ctls { display: flex; justify-content: center; gap: 22px; padding: 14px 16px 18px; }
+      .x-ctl { display: grid; justify-items: center; gap: 6px; font: var(--type-caption); color: var(--hero-text-muted); background: none; border: 0; padding: 0; cursor: pointer; }
+      .x-ctl__b { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke); color: var(--hero-text); transition: transform var(--dur-quick) var(--ease-out); }
+      .x-ctl:active .x-ctl__b { transform: scale(0.94); }
+      .x-ctl[aria-pressed="true"] .x-ctl__b { background: var(--hero-text); color: var(--hero-surface); }
+      .x-ctl--end .x-ctl__b { background: var(--fill-system-red); border-color: transparent; }
+      .x-type {
+        position: absolute; inset: 12px 12px auto; z-index: 4; display: grid; gap: 8px; padding: 12px 14px;
+        border-radius: var(--r-l); background: var(--hero-glass); -webkit-backdrop-filter: var(--hark-blur); backdrop-filter: var(--hark-blur);
+        border: 1px solid var(--hero-glass-stroke);
+      }
+      .x-type__lbl { font: var(--type-caption); color: var(--hero-text-muted); }
+      .x-type__note { display: flex; align-items: center; gap: 6px; font: var(--type-tag); color: var(--hero-text); }
+      .x-type__note::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fill-system-orange); flex: none; }
+      .x-type__row { display: flex; gap: 8px; }
+      .x-type__row input {
+        flex: 1; min-width: 0; min-height: var(--tap); padding: 0 16px; border-radius: var(--r-pill);
+        border: 1px solid var(--hero-glass-stroke); background: var(--hero-scrim-strong); color: var(--hero-text); font: var(--type-body);
+      }
+      .x-type__row input::placeholder { color: var(--hero-text-muted); }
+      .x-type__row button { flex: none; min-height: var(--tap); padding: 0 18px; border-radius: var(--r-pill); border: 0; background: var(--hero-text); color: var(--hero-surface); font: var(--type-label); cursor: pointer; }
+      .x-missing { display: grid; gap: 8px; padding: 14px; border: 1px dashed var(--stroke-primary); border-radius: var(--r-m); }
+      .x-missing input[type="file"] { font: var(--type-small); min-height: var(--tap); }
+      .x-ctl .off { display: none; }
+      .x-ctl[aria-pressed="true"] .on { display: none; }
+      .x-ctl[aria-pressed="true"] .off { display: block; }
+
+      .x-dialog { max-width: min(360px, calc(100vw - 32px)); padding: 20px; border-radius: var(--r-l); border: 1px solid var(--stroke-primary); background: var(--fill-primary-on); color: var(--text-primary); box-shadow: var(--hark-shadow); }
+      .x-dialog::backdrop { background: var(--hero-scrim-strong); }
+      .x-dialog h2 { font: var(--type-heading); margin-bottom: 8px; }
+      .x-dialog p { color: var(--text-secondary); margin-bottom: 18px; }
+      .x-dialog .x-cta { background: var(--fill-system-red); color: var(--hero-text); }
+      .x-toast {
+        position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); z-index: 50; transform: translateX(-50%);
+        width: max-content; max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: var(--r-m);
+        background: var(--fill-primary); color: var(--text-primary-on); font: var(--type-label); box-shadow: var(--hark-shadow);
+      }
+      .x-ended h1 { font: var(--type-title); overflow-wrap: anywhere; }
+      .x-actions { display: grid; gap: 10px; }
+      .x-tline .timeline__what b { font-weight: var(--weight-bold); }
+      @media (prefers-reduced-motion: reduce) {
+        .x-facewrap, .x-avatar, .x-bars span, .x-cta, .x-ctl__b { transition: none !important; }
+        .x-stage.is-speaking .x-facewrap, .x-stage.is-speaking .x-avatar { transform: none; }
+        .x-stage.is-speaking .x-avatar { box-shadow: 0 0 0 6px color-mix(in srgb, var(--fill-system-green) 40%, transparent); }
+        .x-bars span { transform: scaleY(0.4) !important; }
+        .x-facewrap img { transition: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page x-app" id="top">
+      <main class="main">
+        <!-- SCREEN 1: SETUP -->
+        <section class="x-screen" id="s-setup" aria-labelledby="h-setup">
+          <div class="x-title">
+            <p class="x-eyebrow">MRCGP SCA practice</p>
+            <h1 id="h-setup" tabindex="-1">SCA Live Call</h1>
+            <p class="x-lede">A live voice or video consultation with an AI simulated patient. 3 minutes reading, 12 minutes consulting.</p>
+          </div>
+
+          <div class="x-group">
+            <label class="x-label" for="key">Gemini API key</label>
+            <input class="x-input" id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key" />
+            <label class="x-check"><input type="checkbox" id="remember" /> Remember on this device</label>
+            <p class="fineprint">Free key from <a class="link" href="https://aistudio.google.com" target="_blank" rel="noopener">aistudio.google.com</a>. It stays in this browser and is sent only to Google.</p>
+            <p class="x-error" id="key-err" role="alert" hidden>Enter your Gemini API key to continue.</p>
+          </div>
+
+          <div class="x-group">
+            <div class="x-row" style="justify-content: space-between">
+              <h2 id="h-cases">Case</h2>
+              <button class="x-ghost" type="button" id="random">Random case</button>
+            </div>
+            <div class="x-cases" id="cases-list" role="radiogroup" aria-labelledby="h-cases" aria-label="Case picker"><p class="x-none" style="padding: 14px">Loading cases…</p></div>
+            <div class="x-missing" id="cases-missing" hidden>
+              <p class="x-error" role="alert">Case file not found</p>
+              <label class="x-label" for="cases-file">Load cases file (.json)</label>
+              <input type="file" id="cases-file" accept=".json,application/json" aria-label="Load cases file (.json)" />
+              <p class="x-error" id="cases-file-err" hidden>That file could not be read as a cases list.</p>
+            </div>
+            <p class="x-picked" id="picked" aria-live="polite"></p>
+          </div>
+
+          <div class="x-group">
+            <label class="x-label" for="voice">Patient voice</label>
+            <select class="x-select" id="voice">
+              <option value="auto">Auto (case default)</option>
+              <option value="Kore">Female (Kore)</option>
+              <option value="Charon">Male (Charon)</option>
+            </select>
+          </div>
+
+          <button class="x-cta x-cta--wide" type="button" id="open-notes">Open case notes</button>
+        </section>
+
+        <!-- SCREEN 2: CASE NOTES -->
+        <section class="x-screen" id="s-notes" aria-labelledby="h-notes" hidden>
+          <div class="x-readbar" id="readbar">
+            <div class="x-readbar__t" aria-live="polite">
+              <small>Reading time</small>
+              <span class="x-clock" id="read-clock">3:00</span>
+            </div>
+            <button class="x-cta" type="button" id="start-call">Start call now</button>
+          </div>
+          <div class="x-title">
+            <p class="x-eyebrow"><span class="chip" id="notes-mode">Video</span></p>
+            <h1 id="h-notes" tabindex="-1" style="font: var(--type-title)">Case notes</h1>
+          </div>
+          <div class="x-brief" id="notes-brief"></div>
+          <p class="fineprint" id="call-hint"></p>
+          <div class="x-row"><button class="x-ghost" type="button" id="back-setup">Back to cases</button></div>
+        </section>
+
+        <!-- SCREEN 4: ENDED -->
+        <section class="x-screen x-ended" id="s-ended" aria-labelledby="h-ended" hidden>
+          <div class="x-title">
+            <p class="x-eyebrow" id="ended-flag"></p>
+            <h1 id="h-ended" tabindex="-1">Consultation ended</h1>
+            <p class="x-lede" id="ended-case"></p>
+          </div>
+          <section class="stats">
+            <div class="stat"><span class="stat__fig" id="ended-dur">0:00</span><span class="stat__label">Consultation time</span></div>
+            <div class="stat"><span class="stat__fig" id="ended-lines">0</span><span class="stat__label">Transcript lines</span></div>
+          </section>
+          <div class="x-actions">
+            <button class="x-cta x-cta--wide" type="button" id="copy">Copy for marking</button>
+            <div class="x-row">
+              <button class="x-ghost" type="button" id="download">Download transcript (.txt)</button>
+              <button class="x-ghost" type="button" id="new-case">New case</button>
+            </div>
+            <p class="fineprint">Transcription is automatic and can mishear words.</p>
+          </div>
+          <div class="aside">
+            <h3>Report a problem</h3>
+            <p class="fineprint">If the patient leaked hidden details, dropped facts, or broke character, copy the transcript and tell Hark which turn.</p>
+          </div>
+          <div class="x-group">
+            <h2>Transcript</h2>
+            <ol class="timeline x-tline" id="ended-tx"></ol>
+          </div>
+          <div class="x-group">
+            <h2>Case brief</h2>
+            <div class="x-brief" id="ended-brief"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- SCREEN 3: CALL -->
+    <section class="x-call" id="s-call" aria-label="Consultation call" hidden>
+      <div class="x-top">
+        <div style="display: grid; gap: 4px; min-width: 0">
+          <p class="x-status" id="status" data-state="connecting" role="status" aria-live="polite">Connecting</p>
+          <p class="x-closeinfo" id="close-info" hidden></p>
+          <p class="x-top__case" id="call-case"></p>
+        </div>
+        <p class="x-timer" id="timer" aria-label="Time remaining">12:00</p>
+      </div>
+      <p class="x-blockbar" id="blockbar" role="status" aria-live="polite" hidden>The model blocked that reply. Try rephrasing your last question.</p>
+      <p class="x-warnbar" id="warnbar" hidden>Under 1 minute left. Start closing the consultation.</p>
+      <div class="x-stage" id="stage">
+        <div class="x-facewrap" id="facewrap" hidden></div>
+        <div class="x-phone" id="phone" hidden>
+          <div class="x-avatar" id="avatar" aria-hidden="true"></div>
+          <p class="x-phone__name" id="phone-name"></p>
+          <p class="x-phone__label">Telephone consultation</p>
+          <div class="x-bars" id="bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="x-self" id="self" hidden><video id="self-video" muted playsinline autoplay></video></div>
+        <div class="x-tx" id="tx" aria-live="off" hidden></div>
+        <form class="x-type" id="type-box" aria-label="Type instead" autocomplete="off" hidden>
+          <p class="x-type__note" id="type-note" role="status" hidden>Mic unavailable - type instead</p>
+          <label class="x-type__lbl" for="type-input">Type instead</label>
+          <div class="x-type__row">
+            <input id="type-input" type="text" enterkeyhint="send" placeholder="Say something to the patient" aria-label="Type instead" />
+            <button type="submit" id="type-send" aria-label="Send">Send</button>
+          </div>
+        </form>
+        <div class="x-banner" id="banner" role="alert" hidden>1 minute left</div>
+        <div class="x-msg" id="msg" role="alert" hidden>
+          <p id="msg-text"></p>
+          <div class="x-row" id="msg-actions"></div>
+        </div>
+      </div>
+      <div class="x-ctls">
+        <button class="x-ctl" type="button" id="mute" aria-pressed="false">
+          <span class="x-ctl__b">
+            <svg class="on" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>
+            <svg class="off" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" /></svg>
+          </span>
+          <span id="mute-label">Mute</span>
+        </button>
+        <button class="x-ctl" type="button" id="tx-toggle" aria-pressed="false" aria-controls="tx">
+          <span class="x-ctl__b"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 6h14M5 11h14M5 16h9" /></svg></span>
+          <span>Live transcript</span>
+        </button>
+        <button class="x-ctl" type="button" id="type-toggle" aria-pressed="false" aria-controls="type-box" aria-label="Type">
+          <span class="x-ctl__b"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8" /></svg></span>
+          <span>Type</span>
+        </button>
+        <button class="x-ctl x-ctl--end" type="button" id="end" aria-label="End consultation">
+          <span class="x-ctl__b"><svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.5 14.2c5.2-4.9 13.8-4.9 19 0l-2.6 2.8-3.8-1.7v-2.6a11.5 11.5 0 0 0-6.2 0v2.6L5.1 17z" /></svg></span>
+          <span>End consultation</span>
+        </button>
+      </div>
+    </section>
+
+    <dialog class="x-dialog" id="confirm" aria-labelledby="confirm-h">
+      <h2 id="confirm-h">End the consultation?</h2>
+      <p>The call stops and you get the transcript for marking.</p>
+      <div class="x-row">
+        <button class="x-cta" type="button" id="confirm-yes">End consultation</button>
+        <button class="x-ghost" type="button" id="confirm-no">Keep going</button>
+      </div>
+    </dialog>
+
+    <div class="x-toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <div id="faces" hidden>
+      <img data-file="sca02_neutral.jpg" src="sca02_neutral.jpg" alt="" />
+      <img data-file="sca02_frustrated.jpg" src="sca02_frustrated.jpg" alt="" />
+      <img data-file="sca02_worried.jpg" src="sca02_worried.jpg" alt="" />
+      <img data-file="sca03_neutral.jpg" src="sca03_neutral.jpg" alt="" />
+      <img data-file="sca03_relieved.jpg" src="sca03_relieved.jpg" alt="" />
+      <img data-file="sca03_worried.jpg" src="sca03_worried.jpg" alt="" />
+      <img data-file="sca04_neutral.jpg" src="sca04_neutral.jpg" alt="" />
+      <img data-file="sca04_flat.jpg" src="sca04_flat.jpg" alt="" />
+      <img data-file="sca04_worried.jpg" src="sca04_worried.jpg" alt="" />
+      <img data-file="sca05_neutral.jpg" src="sca05_neutral.jpg" alt="" />
+      <img data-file="sca05_flat.jpg" src="sca05_flat.jpg" alt="" />
+      <img data-file="sca05_tearful.jpg" src="sca05_tearful.jpg" alt="" />
+      <img data-file="sca07_neutral.jpg" src="sca07_neutral.jpg" alt="" />
+      <img data-file="sca07_tearful.jpg" src="sca07_tearful.jpg" alt="" />
+      <img data-file="sca07_worried.jpg" src="sca07_worried.jpg" alt="" />
+      <img data-file="sca08_neutral.jpg" src="sca08_neutral.jpg" alt="" />
+      <img data-file="sca08_relieved.jpg" src="sca08_relieved.jpg" alt="" />
+      <img data-file="sca08_worried.jpg" src="sca08_worried.jpg" alt="" />
+      <img data-file="sca09_neutral.jpg" src="sca09_neutral.jpg" alt="" />
+      <img data-file="sca09_flat.jpg" src="sca09_flat.jpg" alt="" />
+      <img data-file="sca09_worried.jpg" src="sca09_worried.jpg" alt="" />
+      <img data-file="sca10_neutral.jpg" src="sca10_neutral.jpg" alt="" />
+      <img data-file="sca10_defensive.jpg" src="sca10_defensive.jpg" alt="" />
+      <img data-file="sca10_worried.jpg" src="sca10_worried.jpg" alt="" />
+      <img data-file="sca12_neutral.jpg" src="sca12_neutral.jpg" alt="" />
+      <img data-file="sca12_frustrated.jpg" src="sca12_frustrated.jpg" alt="" />
+      <img data-file="sca12_worried.jpg" src="sca12_worried.jpg" alt="" />
+      <img data-file="case01_neutral.jpg" src="case01_neutral.jpg" alt="" />
+      <img data-file="case01_worried.jpg" src="case01_worried.jpg" alt="" />
+      <img data-file="case01_relieved.jpg" src="case01_relieved.jpg" alt="" />
+      <img data-file="case01_defensive.jpg" src="case01_defensive.jpg" alt="" />
+      <img data-file="sca14_neutral.jpg" src="sca14_neutral.jpg" alt="" />
+      <img data-file="sca14_tearful.jpg" src="sca14_tearful.jpg" alt="" />
+      <img data-file="sca14_worried.jpg" src="sca14_worried.jpg" alt="" />
+      <img data-file="sca15_neutral.jpg" src="sca15_neutral.jpg" alt="" />
+      <img data-file="sca15_defensive.jpg" src="sca15_defensive.jpg" alt="" />
+      <img data-file="sca15_worried.jpg" src="sca15_worried.jpg" alt="" />
+      <img data-file="sca16_neutral.jpg" src="sca16_neutral.jpg" alt="" />
+      <img data-file="sca16_defensive.jpg" src="sca16_defensive.jpg" alt="" />
+      <img data-file="sca16_worried.jpg" src="sca16_worried.jpg" alt="" />
+      <img data-file="sca17_neutral.jpg" src="sca17_neutral.jpg" alt="" />
+      <img data-file="sca17_relieved.jpg" src="sca17_relieved.jpg" alt="" />
+      <img data-file="sca17_tearful.jpg" src="sca17_tearful.jpg" alt="" />
+      <img data-file="sca18_neutral.jpg" src="sca18_neutral.jpg" alt="" />
+      <img data-file="sca18_in_pain.jpg" src="sca18_in_pain.jpg" alt="" />
+      <img data-file="sca18_worried.jpg" src="sca18_worried.jpg" alt="" />
+      <img data-file="sca19_neutral.jpg" src="sca19_neutral.jpg" alt="" />
+      <img data-file="sca19_frustrated.jpg" src="sca19_frustrated.jpg" alt="" />
+      <img data-file="sca19_worried.jpg" src="sca19_worried.jpg" alt="" />
+      <img data-file="sca20_neutral.jpg" src="sca20_neutral.jpg" alt="" />
+      <img data-file="sca20_frustrated.jpg" src="sca20_frustrated.jpg" alt="" />
+      <img data-file="sca20_tearful.jpg" src="sca20_tearful.jpg" alt="" />
+      <img data-file="sca23_neutral.jpg" src="sca23_neutral.jpg" alt="" />
+      <img data-file="sca23_defensive.jpg" src="sca23_defensive.jpg" alt="" />
+      <img data-file="sca23_tearful.jpg" src="sca23_tearful.jpg" alt="" />
+      <img data-file="sca24_neutral.jpg" src="sca24_neutral.jpg" alt="" />
+      <img data-file="sca24_defensive.jpg" src="sca24_defensive.jpg" alt="" />
+      <img data-file="sca24_tearful.jpg" src="sca24_tearful.jpg" alt="" />
+      <img data-file="sca25_neutral.jpg" src="sca25_neutral.jpg" alt="" />
+      <img data-file="sca25_frustrated.jpg" src="sca25_frustrated.jpg" alt="" />
+      <img data-file="sca25_tearful.jpg" src="sca25_tearful.jpg" alt="" />
+      <img data-file="sca26_neutral.jpg" src="sca26_neutral.jpg" alt="" />
+      <img data-file="sca26_relieved.jpg" src="sca26_relieved.jpg" alt="" />
+      <img data-file="sca26_worried.jpg" src="sca26_worried.jpg" alt="" />
+      <img data-file="sca28_neutral.jpg" src="sca28_neutral.jpg" alt="" />
+      <img data-file="sca28_frustrated.jpg" src="sca28_frustrated.jpg" alt="" />
+      <img data-file="sca28_worried.jpg" src="sca28_worried.jpg" alt="" />
+      <img data-file="sca29_neutral.jpg" src="sca29_neutral.jpg" alt="" />
+      <img data-file="sca29_defensive.jpg" src="sca29_defensive.jpg" alt="" />
+      <img data-file="sca29_flat.jpg" src="sca29_flat.jpg" alt="" />
+      <img data-file="sca30_neutral.jpg" src="sca30_neutral.jpg" alt="" />
+      <img data-file="sca30_tearful.jpg" src="sca30_tearful.jpg" alt="" />
+      <img data-file="sca30_worried.jpg" src="sca30_worried.jpg" alt="" />
+      <img data-file="sca32_neutral.jpg" src="sca32_neutral.jpg" alt="" />
+      <img data-file="sca32_defensive.jpg" src="sca32_defensive.jpg" alt="" />
+      <img data-file="sca32_worried.jpg" src="sca32_worried.jpg" alt="" />
+      <img data-file="sca33_neutral.jpg" src="sca33_neutral.jpg" alt="" />
+      <img data-file="sca33_defensive.jpg" src="sca33_defensive.jpg" alt="" />
+      <img data-file="sca33_relieved.jpg" src="sca33_relieved.jpg" alt="" />
+      <img data-file="sca34_neutral.jpg" src="sca34_neutral.jpg" alt="" />
+      <img data-file="sca34_frustrated.jpg" src="sca34_frustrated.jpg" alt="" />
+      <img data-file="sca34_in_pain.jpg" src="sca34_in_pain.jpg" alt="" />
+      <img data-file="sca36_neutral.jpg" src="sca36_neutral.jpg" alt="" />
+      <img data-file="sca36_frustrated.jpg" src="sca36_frustrated.jpg" alt="" />
+      <img data-file="sca36_tearful.jpg" src="sca36_tearful.jpg" alt="" />
+    </div>
+
+    <script type="application/json" id="cases" src="live_cases.json"></script>
+    <script src="hark.js"></script>
+    <script>
+(function () {
+  "use strict";
+  /* ---- Config ---- */
+  var MODEL = "models/gemini-3.8-live";
+  var FALLBACK_MODEL = "models/gemini-3.1-flash-live-preview";
+  var WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=";
+  var CALL_SECS = 720, READ_SECS = 180, KEY_STORE = "scaLiveCall.apiKey";
+
+  var $ = function (id) { return document.getElementById(id); };
+  var CASES = [];
+  var FACES = {};
+  document.querySelectorAll("#faces img").forEach(function (img) { FACES[img.getAttribute("data-file")] = img; });
+  var reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var S = { key: "", c: null, voice: "Kore", model: MODEL, triedFallback: false, tx: [], muted: false };
+
+  function fmt(sec) { sec = Math.max(0, Math.floor(sec)); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function show(id) {
+    ["s-setup", "s-notes", "s-ended", "s-call"].forEach(function (s) { $(s).hidden = s !== id; });
+    window.scrollTo(0, 0);
+    var h = $(id).querySelector("h1[tabindex]");
+    if (h) h.focus({ preventScroll: true });
+  }
+  function toast(text) {
+    var t = $("toast"); t.textContent = text; t.hidden = false;
+    clearTimeout(toast.t); toast.t = setTimeout(function () { t.hidden = true; }, 3500);
+  }
+  function decodeP(b64) {
+    var bin = atob(b64), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+  function bufToB64(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  }
+
+  /* ---- Brief rendering (generic) ---- */
+  var LABELS = { consultation_type: "Consultation", patient: "Patient", caller: "Caller", pmh: "Past medical history",
+    medications: "Medications", allergies: "Allergies", immunisations: "Immunisations", recent_results: "Recent results",
+    recent_consultations: "Recent consultations", family_history: "Family history", social: "Social history", notes: "Notes", images: "Images" };
+  function label(k) { return LABELS[k] || String(k).replace(/_/g, " ").replace(/^./, function (c) { return c.toUpperCase(); }); }
+  function isObj(v) { return v && typeof v === "object" && !Array.isArray(v); }
+  function inlineText(v) {
+    if (v == null) return "";
+    if (Array.isArray(v)) return v.map(inlineText).join("; ");
+    if (isObj(v)) return Object.keys(v).map(function (k) { return label(k) + ": " + inlineText(v[k]); }).join(", ");
+    return String(v);
+  }
+  function renderValue(v) {
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return el("p", "x-none", "None recorded");
+    if (Array.isArray(v)) {
+      if (v.every(isObj)) {
+        var cols = [];
+        v.forEach(function (o) { Object.keys(o).forEach(function (k) { if (cols.indexOf(k) < 0) cols.push(k); }); });
+        var wrap = el("div", "table-wrap"), table = el("table"), thead = el("thead"), hr = el("tr"), tb = el("tbody");
+        cols.forEach(function (c) { var th = el("th", null, label(c)); th.scope = "col"; hr.appendChild(th); });
+        thead.appendChild(hr); table.appendChild(thead);
+        v.forEach(function (o) {
+          var tr = el("tr");
+          cols.forEach(function (c, i) {
+            var val = inlineText(o[c]);
+            var cell = el(i ? "td" : "th", null, val);
+            if (i) { cell.setAttribute("data-label", label(c)); if (!val) cell.className = "is-empty"; } else cell.scope = "row";
+            tr.appendChild(cell);
+          });
+          tb.appendChild(tr);
+        });
+        table.appendChild(tb); wrap.appendChild(table); return wrap;
+      }
+      var ul = el("ul");
+      v.forEach(function (item) { ul.appendChild(el("li", null, inlineText(item))); });
+      return ul;
+    }
+    if (isObj(v)) {
+      var dl = el("dl", "x-kv");
+      Object.keys(v).forEach(function (k) { dl.appendChild(el("dt", null, label(k))); dl.appendChild(el("dd", null, inlineText(v[k]))); });
+      return dl;
+    }
+    return el("p", null, String(v));
+  }
+  function renderBrief(brief, box) {
+    box.textContent = "";
+    Object.keys(brief || {}).forEach(function (k) {
+      var sec = el("section", "x-bsec");
+      sec.appendChild(el("h3", null, label(k)));
+      sec.appendChild(renderValue(brief[k]));
+      box.appendChild(sec);
+    });
+  }
+
+  /* ---- Setup screen ---- */
+  try { var saved = localStorage.getItem(KEY_STORE); if (saved) { $("key").value = saved; $("remember").checked = true; } } catch (e) {}
+  var list = $("cases-list");
+  function initCases() {
+    list.textContent = "";
+    CASES.forEach(function (c, i) {
+      var row = el("label", "x-case");
+      var r = el("input"); r.type = "radio"; r.name = "case"; r.value = c.id; r.id = "case-" + c.id; if (!i) r.checked = true;
+      row.appendChild(r);
+      row.appendChild(el("span", "x-case__t", c.candidate_title));
+      row.appendChild(el("span", "chip", c.mode === "telephone" ? "Telephone" : "Video"));
+      list.appendChild(row);
+    });
+    $("cases-missing").hidden = true;
+    updatePicked();
+  }
+  function setCases(data) {
+    if (!Array.isArray(data) || !data.length || !data.every(function (c) { return c && c.id && c.candidate_title; })) throw new Error("Not a cases list");
+    CASES = data.slice().sort(function (a, b) { return String(a.id).localeCompare(String(b.id), undefined, { numeric: true }); });
+    initCases();
+  }
+  function casesMissing() {
+    list.textContent = "";
+    list.appendChild(el("p", "x-none", "No cases loaded.")).style.padding = "14px";
+    $("cases-missing").hidden = false;
+  }
+  function loadCases() {
+    var raw = ($("cases").textContent || "").trim();
+    if (raw) { try { setCases(JSON.parse(raw)); return; } catch (e) {} }
+    if (!window.fetch) { casesMissing(); return; }
+    fetch("live_cases.json").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(setCases).catch(casesMissing);
+  }
+  $("cases-file").addEventListener("change", function () {
+    var f = this.files && this.files[0], err = $("cases-file-err");
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try { setCases(JSON.parse(String(rd.result))); err.hidden = true; toast("Loaded " + CASES.length + " cases"); }
+      catch (e) { err.hidden = false; }
+    };
+    rd.onerror = function () { err.hidden = false; };
+    rd.readAsText(f);
+  });
+  $("random").addEventListener("click", function () {
+    var radios = [].slice.call(list.querySelectorAll("input")).filter(function (x) { return !x.checked; });
+    if (!radios.length) return;
+    var r = radios[Math.floor(Math.random() * radios.length)];
+    r.checked = true;
+    var row = r.closest(".x-case");
+    list.scrollTop = row.offsetTop - list.offsetTop - 8;
+    updatePicked();
+  });
+  function updatePicked() {
+    var r = list.querySelector("input:checked");
+    $("picked").textContent = r ? "Selected: " + r.parentNode.querySelector(".x-case__t").textContent : "";
+  }
+  list.addEventListener("change", updatePicked);
+  loadCases();
+  $("open-notes").addEventListener("click", function () {
+    if (!CASES.length) { toast("Load the cases file first."); return; }
+    var key = $("key").value.trim();
+    if (!key) { $("key-err").hidden = false; $("key").focus(); return; }
+    $("key-err").hidden = true;
+    S.key = key;
+    try { if ($("remember").checked) localStorage.setItem(KEY_STORE, key); else localStorage.removeItem(KEY_STORE); } catch (e) {}
+    var id = (list.querySelector("input:checked") || {}).value;
+    S.c = CASES.filter(function (c) { return c.id === id; })[0] || CASES[0];
+    var v = $("voice").value;
+    S.voice = v === "auto" ? (S.c.voice || "Kore") : v;
+    openNotes();
+  });
+
+  /* ---- Case notes screen ---- */
+  var readTimer = null;
+  function openNotes() {
+    var c = S.c, video = c.mode !== "telephone";
+    $("notes-mode").textContent = video ? "Video consultation" : "Telephone consultation";
+    $("h-notes").textContent = c.candidate_title;
+    renderBrief(c.brief, $("notes-brief"));
+    $("call-hint").textContent = video
+      ? "Starting the call asks for your microphone, and your camera for the self-view only. The doctor speaks first."
+      : "Starting the call asks for your microphone. The doctor speaks first.";
+    $("readbar").classList.remove("is-over");
+    var end = Date.now() + READ_SECS * 1000;
+    clearInterval(readTimer);
+    var tick = function () {
+      var left = Math.ceil((end - Date.now()) / 1000);
+      if (left <= 0) { clearInterval(readTimer); $("read-clock").textContent = "Reading time over"; $("readbar").classList.add("is-over"); return; }
+      $("read-clock").textContent = fmt(left);
+    };
+    tick(); readTimer = setInterval(tick, 250);
+    show("s-notes");
+  }
+  $("back-setup").addEventListener("click", function () { clearInterval(readTimer); show("s-setup"); });
+  $("start-call").addEventListener("click", startCall);
+
+  /* ---- Call ---- */
+  var A = {}; // audio + media
+  var WORKLET = "class Cap extends AudioWorkletProcessor{constructor(){super();this.ratio=sampleRate/16000;this.buf=new Int16Array(1280);this.n=0;this.acc=0;this.cnt=0;this.pos=0;}" +
+    "process(inputs){var ch=inputs[0]&&inputs[0][0];if(!ch)return true;for(var i=0;i<ch.length;i++){this.acc+=ch[i];this.cnt++;this.pos+=1;" +
+    "if(this.pos>=this.ratio){this.pos-=this.ratio;var s=this.acc/this.cnt;this.acc=0;this.cnt=0;s=Math.max(-1,Math.min(1,s));" +
+    "this.buf[this.n++]=s<0?s*32768:s*32767;if(this.n===this.buf.length){this.port.postMessage(this.buf.buffer,[this.buf.buffer]);this.buf=new Int16Array(1280);this.n=0;}}}return true;}}" +
+    "registerProcessor('sca-capture',Cap);";
+
+  function setStatus(state, text) { var s = $("status"); s.setAttribute("data-state", state); s.textContent = text; }
+  function message(text, actions) {
+    $("msg-text").textContent = text;
+    var box = $("msg-actions"); box.textContent = "";
+    (actions || []).forEach(function (a) { var b = el("button", null, a[0]); b.type = "button"; b.addEventListener("click", a[1]); box.appendChild(b); });
+    $("msg").hidden = false;
+    var first = box.querySelector("button"); if (first) first.focus();
+  }
+  function hideMessage() { $("msg").hidden = true; }
+  function elapsed() { return S.callStart ? Math.min(CALL_SECS, (Date.now() - S.callStart) / 1000) : 0; }
+
+  function personName() {
+    var b = S.c.brief || {}, p = b.patient || {};
+    if (S.c.mode === "telephone" && typeof b.caller === "string" && b.caller) return b.caller.split(/\s*[(\u2013]|\s+-\s+/)[0].trim();
+    return (isObj(p) && p.name) || "Patient";
+  }
+  function initials(n) { var w = n.split(/\s+/).filter(Boolean); return ((w[0] || "?")[0] + (w.length > 1 ? w[w.length - 1][0] : "")).toUpperCase(); }
+
+  function buildStage() {
+    var c = S.c, video = c.mode !== "telephone";
+    $("call-case").textContent = c.candidate_title;
+    $("timer").textContent = fmt(CALL_SECS); $("timer").classList.remove("is-low");
+    $("warnbar").hidden = true; $("banner").hidden = true; hideMessage();
+    $("blockbar").hidden = true; $("close-info").hidden = true; $("close-info").textContent = ""; S.blockRetries = 0;
+    $("tx").textContent = ""; renderLiveTx();
+    var fw = $("facewrap"); fw.textContent = "";
+    S.faceImgs = {};
+    if (video && c.faces && c.faces.length) {
+      c.faces.forEach(function (f, i) {
+        var src = FACES[f]; if (!src) return;
+        var img = src.cloneNode(true);
+        var ex = (c.expressions || [])[i] || "face" + i;
+        img.alt = personName() + ", " + ex.replace(/_/g, " ");
+        fw.appendChild(img); S.faceImgs[ex] = img;
+      });
+      var exs = c.expressions || [];
+      setExpression(exs.indexOf("neutral") >= 0 ? "neutral" : exs[0]);
+      fw.hidden = false; $("phone").hidden = true;
+    } else {
+      fw.hidden = true; $("phone").hidden = false;
+      var n = personName();
+      $("avatar").textContent = initials(n);
+      var pn = (c.brief && c.brief.patient && c.brief.patient.name) || "";
+      $("phone-name").textContent = n + (pn && pn !== n ? " \u00b7 about " + pn : "");
+    }
+    $("self").hidden = true;
+  }
+  function setExpression(ex) {
+    var imgs = S.faceImgs || {}, target = imgs[ex];
+    if (!target) return false;
+    Object.keys(imgs).forEach(function (k) { imgs[k].classList.toggle("is-on", imgs[k] === target); });
+    return true;
+  }
+
+  async function startCall() {
+    clearInterval(readTimer);
+    // Audio contexts are created and resumed inside the tap (Android autoplay).
+    try { A.out = new AudioContext({ sampleRate: 24000 }); } catch (e) { A.out = new AudioContext(); }
+    A.inp = new AudioContext();
+    A.out.resume(); A.inp.resume();
+    A.analyser = A.out.createAnalyser(); A.analyser.fftSize = 1024; A.analyser.connect(A.out.destination);
+    A.sources = new Set(); A.nextT = 0;
+    S.tx = []; S.callStart = 0; S.ended = false; S.warned = false; S.endReason = ""; S.muted = false; S.model = MODEL; S.triedFallback = false; S.hasConnected = false; S.pendingRecap = null;
+    $("mute").setAttribute("aria-pressed", "false"); $("mute-label").textContent = "Mute";
+    setTypeBox(false); $("type-note").hidden = true; $("type-input").value = "";
+    buildStage();
+    show("s-call");
+    setStatus("connecting", "Connecting \u00b7 asking for microphone");
+    try {
+      A.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch (e) {
+      // Keep the call going in typed mode.
+      A.mic = null;
+      setStatus("connecting", "Connecting \u00b7 mic unavailable");
+      $("type-note").hidden = false;
+      setTypeBox(true);
+      toast("Mic unavailable - type instead");
+    }
+    if (S.c.mode !== "telephone") {
+      try {
+        A.cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } }, audio: false });
+        var v = $("self-video"); v.srcObject = A.cam; $("self").hidden = false; v.play().catch(function () {});
+      } catch (e) { A.cam = null; toast("Camera unavailable. Carrying on audio-only."); }
+    }
+    if (A.mic) try {
+      var url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
+      await A.inp.audioWorklet.addModule(url);
+      A.src = A.inp.createMediaStreamSource(A.mic);
+      A.node = new AudioWorkletNode(A.inp, "sca-capture", { numberOfOutputs: 1 });
+      A.sink = A.inp.createGain(); A.sink.gain.value = 0;
+      A.src.connect(A.node); A.node.connect(A.sink); A.sink.connect(A.inp.destination);
+      A.node.port.onmessage = function (e) {
+        var ws = S.ws;
+        if (S.muted || !ws || !ws._ready || ws.readyState !== 1) return;
+        ws.send(JSON.stringify({ realtimeInput: { audio: { data: bufToB64(e.data), mimeType: "audio/pcm;rate=16000" } } }));
+      };
+    } catch (e) {
+      setStatus("error", "Error: audio could not start");
+      message("This browser could not start audio capture. Try the latest Chrome.", [["Back to notes", function () { teardown(); show("s-notes"); }]]);
+      return;
+    }
+    wakeLock();
+    levelLoop();
+    connect(null);
+  }
+
+  function setupMessage(model) {
+    var c = S.c;
+    var setup = {
+      model: model,
+      generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: S.voice } } } },
+      systemInstruction: { parts: [{ text: decodeP(c.p) }] },
+      inputAudioTranscription: {},
+      outputAudioTranscription: {}
+    };
+    if (c.mode !== "telephone" && c.expressions && c.expressions.length) {
+      setup.tools = [{ functionDeclarations: [{ name: "set_expression", description: "Change the patient's visible facial expression",
+        parameters: { type: "OBJECT", properties: { expression: { type: "STRING", enum: c.expressions } }, required: ["expression"] } }] }];
+    }
+    return JSON.stringify({ setup: setup });
+  }
+
+  function connect(recap) {
+    hideMessage();
+    var ws;
+    try { ws = new WebSocket(WS_URL + encodeURIComponent(S.key)); } catch (e) { fail("Could not open a connection to Google."); return; }
+    ws.binaryType = "arraybuffer"; ws._ready = false; ws._model = S.model;
+    S.ws = ws;
+    ws.onopen = function () { ws.send(setupMessage(ws._model)); };
+    ws.onmessage = function (ev) {
+      var txt = typeof ev.data === "string" ? ev.data : new TextDecoder().decode(ev.data), m;
+      try { m = JSON.parse(txt); } catch (e) { return; }
+      handle(m, ws, recap);
+    };
+    ws.onclose = function (ev) { onClose(ev, ws); };
+  }
+
+  function handle(m, ws, recap) {
+    if (ws !== S.ws) return;
+    if (m.setupComplete) {
+      ws._ready = true;
+      setStatus("live", A.mic ? "Live" : "Live \u00b7 Mic unavailable - type instead");
+      hideMessage();
+      if (!S.callStart) { S.callStart = Date.now(); S.clock = setInterval(tickCall, 250); }
+      if (recap) ws.send(JSON.stringify({ realtimeInput: { text: recap } }));
+      S.hasConnected = true;
+    }
+    var sc = m.serverContent;
+    if (sc) {
+      if (sc.interrupted) stopPlayback();
+      if (sc.modelTurn && sc.modelTurn.parts) sc.modelTurn.parts.forEach(function (p) {
+        if (p.inlineData && p.inlineData.data && /audio/.test(p.inlineData.mimeType || "audio")) playPcm(p.inlineData.data);
+      });
+      if (sc.inputTranscription && sc.inputTranscription.text) addTx("Doctor", sc.inputTranscription.text);
+      if (sc.outputTranscription && sc.outputTranscription.text) addTx("Patient", sc.outputTranscription.text);
+    }
+    if (m.toolCall && m.toolCall.functionCalls) {
+      var responses = m.toolCall.functionCalls.map(function (fc) {
+        var ok = fc.name === "set_expression" && setExpression(fc.args && fc.args.expression);
+        return { id: fc.id, name: fc.name, response: { result: ok ? "ok" : "unknown expression" } };
+      });
+      ws.send(JSON.stringify({ toolResponse: { functionResponses: responses } }));
+    }
+    if (m.goAway) setStatus("reconnecting", "Session ending soon");
+    if (turnBlocked(m)) showBlocked();
+    else if (sc && sc.turnComplete) S.blockRetries = 0;
+  }
+
+  /* Blocked replies */
+  var BLOCK_RE = /safety|blocked|prohibited/i;
+  function turnBlocked(m) {
+    var sc = m.serverContent || {}, mt = sc.modelTurn || {}, pf = m.promptFeedback || sc.promptFeedback || {}, e = m.error;
+    var bits = [sc.finishReason, sc.blockReason, mt.finishReason, pf.blockReason, pf.blockReasonMessage];
+    if (e) bits.push(typeof e === "string" ? e : [e.status, e.message, e.code].join(" "));
+    return BLOCK_RE.test(bits.filter(Boolean).join(" "));
+  }
+  function showBlocked() {
+    var b = $("blockbar"); b.hidden = false;
+    clearTimeout(showBlocked.t); showBlocked.t = setTimeout(function () { b.hidden = true; }, 8000);
+  }
+  function showCloseInfo(ev) {
+    var ci = $("close-info");
+    ci.textContent = "Closed \u00b7 code " + ev.code + (ev.reason ? " \u00b7 " + ev.reason : " \u00b7 no reason given");
+    ci.hidden = false;
+  }
+
+  function onClose(ev, ws) {
+    if (ws !== S.ws || S.ended) return;
+    var reason = ev.reason || "";
+    S.ws = null; stopPlayback();
+    showCloseInfo(ev);
+    var quota = /429|quota|RESOURCE_EXHAUSTED|rate limit/i.test(reason);
+    if (quota) { fail("Free daily limit reached, try tomorrow.", reason); return; }
+    if (BLOCK_RE.test(reason) && S.hasConnected && (S.blockRetries || 0) < 3) {
+      S.blockRetries = (S.blockRetries || 0) + 1;
+      showBlocked(); reconnect(); return;
+    }
+    if (!ws._ready) {
+      if (/api[ _]?key|API_KEY|unauthori|permission|PERMISSION_DENIED|UNAUTHENTICATED/i.test(reason)) { fail("Your API key was rejected. Check it on the setup screen.", reason); return; }
+      if (/model/i.test(reason) && !S.triedFallback && ws._model !== FALLBACK_MODEL) {
+        S.triedFallback = true; S.model = FALLBACK_MODEL;
+        setStatus("connecting", "Connecting \u00b7 trying fallback model");
+        connect(S.pendingRecap || null); return;
+      }
+      fail(reason ? "Could not start the session." : "Could not reach Google (code " + ev.code + "). Check your connection.", reason);
+      return;
+    }
+    setStatus("lost", "Connection lost");
+    message("Connection lost. The timer keeps running.", [["Reconnect", reconnect], ["End consultation", function () { endCall("user"); }]]);
+  }
+  function reconnect() {
+    setStatus("reconnecting", "Reconnecting");
+    var recent = transcriptLines().join("\n").slice(-1500);
+    S.pendingRecap = "(Connection dropped. Continue the consultation in character from where you left off. Recent transcript: " + recent + ")";
+    connect(S.pendingRecap);
+  }
+  function fail(text, detail) {
+    setStatus("error", "Error" + (detail ? ": " + detail : ""));
+    var actions = [["Try again", function () { setStatus("connecting", "Connecting"); S.callStart ? reconnect() : connect(null); }]];
+    if (!S.hasConnected) actions.push(["Back to setup", function () { teardown(); show("s-setup"); }]);
+    else actions.push(["End consultation", function () { endCall("user"); }]);
+    message(text + (detail ? " Google said: " + detail : ""), actions);
+  }
+
+  /* Playback */
+  function playPcm(b64) {
+    var out = A.out; if (!out) return;
+    var bin = atob(b64), n = bin.length >> 1, buf = out.createBuffer(1, n, 24000), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) { var v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 32768) v -= 65536; d[i] = v / 32768; }
+    var src = out.createBufferSource(); src.buffer = buf; src.connect(A.analyser);
+    var t = Math.max(A.nextT, out.currentTime + 0.04);
+    src.start(t); A.nextT = t + buf.duration;
+    A.sources.add(src); src.onended = function () { A.sources.delete(src); };
+  }
+  function stopPlayback() {
+    if (!A.sources) return;
+    A.sources.forEach(function (s) { try { s.stop(); } catch (e) {} });
+    A.sources.clear(); A.nextT = 0;
+  }
+  function levelLoop() {
+    var data = new Float32Array(A.analyser.fftSize), stage = $("stage"), bars = $("bars").children, smooth = 0;
+    var step = function () {
+      if (!A.analyser || S.ended) return;
+      A.analyser.getFloatTimeDomainData(data);
+      var sum = 0; for (var i = 0; i < data.length; i++) sum += data[i] * data[i];
+      var rms = Math.sqrt(sum / data.length);
+      smooth = smooth * 0.7 + Math.min(1, rms * 5) * 0.3;
+      var speaking = A.sources.size > 0 && rms > 0.008;
+      stage.classList.toggle("is-speaking", speaking);
+      stage.style.setProperty("--lvl", speaking ? smooth.toFixed(3) : "0");
+      if (!reduceMotion) for (var j = 0; j < bars.length; j++) {
+        var k = speaking ? 0.2 + smooth * (0.6 + 0.4 * Math.sin(Date.now() / (90 + j * 23) + j)) : 0.15;
+        bars[j].style.transform = "scaleY(" + Math.max(0.15, Math.min(1, k)).toFixed(3) + ")";
+      }
+      A.raf = requestAnimationFrame(step);
+    };
+    A.raf = requestAnimationFrame(step);
+  }
+
+  /* Timer */
+  function tickCall() {
+    var left = CALL_SECS - elapsed();
+    $("timer").textContent = fmt(Math.ceil(left));
+    if (left <= 60 && !S.warned) {
+      S.warned = true; $("timer").classList.add("is-low");
+      $("banner").hidden = false;
+      setTimeout(function () { $("banner").hidden = true; if (!S.ended) $("warnbar").hidden = false; }, 4000);
+    }
+    if (left <= 0) endCall("timeup");
+  }
+
+  /* Transcript */
+  function addTx(who, text) {
+    var t = fmt(elapsed()), last = S.tx[S.tx.length - 1];
+    if (last && last.who === who && !last.typed) last.text += text; else S.tx.push({ who: who, t: t, text: text });
+    renderLiveTx();
+  }
+  function clean(s) { return s.replace(/\s+/g, " ").trim(); }
+  var DISCLAIMER_RE = /not (intended as )?medical advice|not medical advice or diagnosis|seek (medical )?care|please (see|consult) a (healthcare|medical) professional|consult a healthcare professional|as an AI|educational purposes|medical advice (or|and) diagnosis (is|are) not provided|seek care from a (healthcare|health care|medical) professional/i;
+  var SENT_RE = /[^.!?]+(?:[.!?]+["')\u201d\u2019]*|$)/g;
+  function lineText(l) {
+    var s = clean(l.text);
+    if (l.who !== "Patient") return s;
+    s = s.replace(/<no speech>/gi, " ").replace(/\{pause\}/gi, " ")
+      .replace(/<[^\s<>]{1,20}>|\{[^\s{}]{1,20}\}/g, " ");
+    s = clean(s).replace(/([a-z0-9][.!?]+["')\u201d\u2019]*)(?=[A-Z])/g, "$1 ");
+    var prev = null;
+    return (s.match(SENT_RE) || [s])
+      .map(function (x) { return x.trim(); })
+      .filter(function (x) {
+        if (!x || DISCLAIMER_RE.test(x)) return false;
+        var k = x.toLowerCase();
+        if (k === prev) return false;
+        prev = k;
+        return true;
+      })
+      .join(" ").trim();
+  }
+  function txLines() { return S.tx.filter(function (l) { return lineText(l); }); }
+  function transcriptLines() {
+    return txLines().map(function (l) { return "[" + l.t + "] " + l.who + ": " + lineText(l); });
+  }
+  function renderLiveTx() {
+    var box = $("tx");
+    if (box.hidden) return;
+    var atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+    box.textContent = "";
+    var lines = txLines();
+    if (!lines.length) box.appendChild(el("p", "x-none", "The transcript appears here as you talk."));
+    lines.forEach(function (l) { var p = el("p"); p.appendChild(el("span", null, l.t)); p.appendChild(el("b", null, l.who + ": ")); p.appendChild(document.createTextNode(lineText(l))); box.appendChild(p); });
+    if (atEnd) box.scrollTop = box.scrollHeight;
+  }
+  $("tx-toggle").addEventListener("click", function () {
+    var on = this.getAttribute("aria-pressed") !== "true";
+    this.setAttribute("aria-pressed", String(on)); $("tx").hidden = !on;
+    if (on) { renderLiveTx(); $("tx").scrollTop = $("tx").scrollHeight; }
+  });
+
+  /* Type instead */
+  function setTypeBox(on) {
+    $("type-toggle").setAttribute("aria-pressed", String(on));
+    $("type-box").hidden = !on;
+    if (on) $("type-input").focus({ preventScroll: true });
+  }
+  $("type-toggle").addEventListener("click", function () {
+    setTypeBox(this.getAttribute("aria-pressed") !== "true");
+  });
+  $("type-box").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = $("type-input"), value = input.value.trim();
+    if (!value) return;
+    var ws = S.ws;
+    if (!ws || !ws._ready || ws.readyState !== 1) { toast("Not connected yet. Send again in a moment."); return; }
+    ws.send(JSON.stringify({ realtimeInput: { text: value } }));
+    S.tx.push({ who: "Doctor", t: fmt(elapsed()), text: value, typed: true });
+    renderLiveTx();
+    input.value = "";
+    input.focus({ preventScroll: true });
+  });
+
+  /* Controls */
+  $("mute").addEventListener("click", function () {
+    S.muted = !S.muted;
+    if (A.mic) A.mic.getAudioTracks().forEach(function (t) { t.enabled = !S.muted; });
+    this.setAttribute("aria-pressed", String(S.muted));
+    $("mute-label").textContent = S.muted ? "Unmute" : "Mute";
+  });
+  $("end").addEventListener("click", function () {
+    var d = $("confirm");
+    if (d.showModal) { d.showModal(); $("confirm-no").focus(); } else if (window.confirm("End the consultation?")) endCall("user");
+  });
+  $("confirm-no").addEventListener("click", function () { $("confirm").close(); });
+  $("confirm-yes").addEventListener("click", function () { $("confirm").close(); endCall("user"); });
+
+  /* Self-view drag */
+  (function () {
+    var box = $("self"), sx, sy, ox, oy, dragging = false;
+    box.addEventListener("pointerdown", function (e) {
+      dragging = true; box.setPointerCapture(e.pointerId);
+      var r = box.getBoundingClientRect(), p = $("stage").getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY; ox = r.left - p.left; oy = r.top - p.top;
+    });
+    box.addEventListener("pointermove", function (e) {
+      if (!dragging) return;
+      var p = $("stage").getBoundingClientRect();
+      var x = Math.max(8, Math.min(p.width - box.offsetWidth - 8, ox + e.clientX - sx));
+      var y = Math.max(8, Math.min(p.height - box.offsetHeight - 8, oy + e.clientY - sy));
+      box.style.left = x + "px"; box.style.top = y + "px"; box.style.right = "auto"; box.style.bottom = "auto";
+    });
+    var stop = function () { dragging = false; };
+    box.addEventListener("pointerup", stop); box.addEventListener("pointercancel", stop);
+  })();
+
+  /* Wake lock */
+  async function wakeLock() {
+    try { if ("wakeLock" in navigator) S.wake = await navigator.wakeLock.request("screen"); } catch (e) { S.wake = null; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && !$("s-call").hidden && !S.ended) {
+      wakeLock();
+      if (A.out) A.out.resume(); if (A.inp) A.inp.resume();
+    }
+  });
+
+  function teardown() {
+    var ws = S.ws; S.ws = null;
+    if (ws) { try { ws.close(); } catch (e) {} }
+    clearInterval(S.clock); S.clock = null;
+    if (A.raf) cancelAnimationFrame(A.raf);
+    stopPlayback();
+    [A.mic, A.cam].forEach(function (s) { if (s) s.getTracks().forEach(function (t) { t.stop(); }); });
+    $("self-video").srcObject = null;
+    [A.inp, A.out].forEach(function (c) { if (c && c.state !== "closed") c.close().catch(function () {}); });
+    A = {};
+    if (S.wake) { S.wake.release().catch(function () {}); S.wake = null; }
+    $("stage").classList.remove("is-speaking");
+  }
+
+  /* ---- Ended screen ---- */
+  function endCall(reason) {
+    if (S.ended) return;
+    S.duration = elapsed();
+    S.ended = true; S.endReason = reason;
+    teardown();
+    if ($("confirm").open) $("confirm").close();
+    var c = S.c;
+    $("ended-flag").innerHTML = "";
+    $("ended-flag").appendChild(el("span", reason === "timeup" ? "chip chip--solid" : "chip", reason === "timeup" ? "Time's up" : "Ended by you"));
+    $("ended-case").textContent = c.candidate_title;
+    $("ended-dur").textContent = fmt(S.duration);
+    var lines = txLines();
+    $("ended-lines").textContent = String(lines.length);
+    var ol = $("ended-tx"); ol.textContent = "";
+    if (!lines.length) { var li0 = el("li"); li0.appendChild(el("p", "timeline__when", "0:00")); li0.appendChild(el("div", "timeline__what", "No speech was transcribed.")); ol.appendChild(li0); }
+    lines.forEach(function (l) {
+      var li = el("li"); li.appendChild(el("p", "timeline__when", l.t));
+      var w = el("div", "timeline__what"); w.appendChild(el("b", null, l.who + ": ")); w.appendChild(document.createTextNode(lineText(l)));
+      li.appendChild(w); ol.appendChild(li);
+    });
+    renderBrief(c.brief, $("ended-brief"));
+    show("s-ended");
+  }
+  function markingText() {
+    var c = S.c, lines = transcriptLines();
+    return "Mark this SCA consultation. Case: " + c.id + " (" + c.candidate_title + "). Mode: " + c.mode + ". Duration: " + fmt(S.duration) + ".\nTRANSCRIPT:\n" +
+      (lines.length ? lines.join("\n") : "(no speech transcribed)") + "\n";
+  }
+  $("copy").addEventListener("click", async function () {
+    var text = markingText(), ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+      var ta = el("textarea"); ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); try { ok = document.execCommand("copy"); } catch (e2) {} ta.remove();
+    }
+    toast(ok ? "Copied - paste into your SCA Practice project in Claude or into Hark" : "Could not copy. Use Download instead.");
+  });
+  $("download").addEventListener("click", function () {
+    var blob = new Blob([markingText()], { type: "text/plain;charset=utf-8" });
+    var a = el("a"); a.href = URL.createObjectURL(blob);
+    a.download = "sca-" + S.c.id.toLowerCase() + "-transcript.txt";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  });
+  $("new-case").addEventListener("click", function () { show("s-setup"); });
+  window.addEventListener("beforeunload", function (e) { if (!$("s-call").hidden && !S.ended) { e.preventDefault(); e.returnValue = ""; } });
+})();
+    </script>
+  </body>
+</html>
