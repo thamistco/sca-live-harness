@@ -34,9 +34,9 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
     if(m.error)res.errors.push(JSON.stringify(m.error).slice(0,400));
     var sc=m.serverContent;
     if(cur&&(sc||m.toolCall))cur.lastAt=Date.now();
-    if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text){cur.reply+=sc.outputTranscription.text;cur.lastOutAt=Date.now()}
+    if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text){cur.reply+=sc.outputTranscription.text;cur.lastOutAt=Date.now();if(!cur.firstOutAt)cur.firstOutAt=Date.now()}
       if(sc.inputTranscription&&sc.inputTranscription.text)cur.heard+=sc.inputTranscription.text;
-      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData){cur.audio_chunks++;cur.lastOutAt=Date.now();if(!cur.firstAudioAt)cur.firstAudioAt=Date.now()}});
+      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text){cur.text_parts+=p.text;if(!cur.firstOutAt)cur.firstOutAt=Date.now()}if(p.inlineData){cur.audio_chunks++;cur.lastOutAt=Date.now();if(!cur.firstAudioAt)cur.firstAudioAt=Date.now()}});
       ["finishReason","blockReason"].forEach(function(k){if(sc[k])cur.flags.push(k+":"+sc[k])});
       if(sc.interrupted)cur.flags.push("interrupted");
       if(sc.turnComplete){cur.complete=true;cur.completes=(cur.completes||0)+1;cur.completeAt=Date.now();if(cur.toolAt&&cur.lastOutAt>cur.toolAt)cur.postToolDone=true;if(waiter){var w2=waiter;waiter=null;w2()}}}
@@ -57,6 +57,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
         for(var o=0;o<raw.length;o+=3200){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(raw.subarray(o,o+3200)),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
         var sil=new Uint8Array(3200);for(var k=0;k<20;k++){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(sil),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
       } else ws.send(JSON.stringify({realtimeInput:{text:text}}));
+      cur.tSent=Date.now();
       var r=await wait(45000);
       for(var q=0;q<6&&!done&&cur.toolAt&&!cur.postToolDone;q++){r=await wait(15000)}
       // settle: keep waiting while output continues after a turnComplete (e.g. after a tool call)
@@ -64,7 +65,7 @@ function runTest(t,key,model,mode){return new Promise(function(resolve){
       cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout"); if(cur.completes>1)cur.flags.push("completes:"+cur.completes);
       // let trailing transcription arrive
       await sleep(600);
-      cur.first_audio_ms=cur.firstAudioAt?cur.firstAudioAt-t0:null; log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms first_audio="+cur.first_audio_ms+"ms");
+      cur.first_audio_ms=cur.firstAudioAt?cur.firstAudioAt-cur.tSent:null; cur.first_out_ms=cur.firstOutAt?cur.firstOutAt-cur.tSent:null; cur.reply_done_ms=cur.completeAt?cur.completeAt-cur.tSent:null; log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms first_out="+cur.first_out_ms+"ms first_audio="+cur.first_audio_ms+"ms reply_done="+cur.reply_done_ms+"ms");
       await sleep(400);
     }
     finish();
