@@ -812,7 +812,7 @@
       if (sc.inputTranscription && sc.inputTranscription.text) { S.docSince = true; addTx("Doctor", sc.inputTranscription.text); }
       if (sc.outputTranscription && sc.outputTranscription.text) {
         var piece = sc.outputTranscription.text;
-        if (!S.turnTx) { S.extra = !S.docSince && !!S.lastReply; S.decided = !S.extra; S.pend = []; S.extraTx = ""; }
+        if (!S.turnTx) { S.extra = (!S.docSince && !!S.lastReply) || !!S.afterTool; S.afterTool = false; S.decided = !S.extra; S.pend = []; S.extraTx = ""; }
         S.turnTx = (S.turnTx || "") + piece;
         if (S.extra && !S.decided) {
           // Second completion with no doctor input since the last reply (usually after a face change).
@@ -842,6 +842,8 @@
       }
     }
     if (m.toolCall && m.toolCall.functionCalls) {
+      // Text already spoken this turn: anything after the tool call is a possible second completion.
+      if (S.turnTx && !S.muteTurn && !S.extra) { S.lastReply = S.turnTx; S.turnTx = ""; S.docSince = false; S.afterTool = true; }
       var responses = m.toolCall.functionCalls.map(function (fc) {
         var ok = fc.name === "set_expression" && setExpression(fc.args && fc.args.expression);
         return { id: fc.id, name: fc.name, response: { result: ok ? "ok" : "unknown expression" } };
@@ -974,7 +976,7 @@
   var SENT_RE = /[^.!?]+(?:[.!?]+["')\u201d\u2019]*|$)/g;
   var DOT = "\u2024", DOT_RE = /\u2024/g;
   var GARBAGE_RE = /```|`[^`]+`|\\[a-zA-Z]+\{|\bEOF\b|\.(py|sh|js|ts|json)\b|\b\w+_\w+\(|__\w+__|\btool\b.*\b(edit|run|call)|run_tests|\bbash\b/;
-  var LEAK_RE = /thought The user|\bthe user (asked|said|is asking)\b|according to (the|my) instructions|maintaining my character|\bin character\b|CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|ONE ITEM AT A TIME|RELEASED HIDDEN AGENDA|hidden_agenda|only_if_asked|freely_given|opening_statement|release_when|release_rule|responds_to_(good|poor)|closing_behaviour|emotional_state|set_expression|\\call:|"persona"\s*:|\{"[a-z_]+"\s*:/i;
+  var LEAK_RE = /(^|\s)---(\s|$)|\bthe user\b|\bdisclaimer\b|\bhealth risk\b|\bno shift in\b|thought The user|\bthe user (asked|said|is asking)\b|according to (the|my) instructions|maintaining my character|\bin character\b|CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|ONE ITEM AT A TIME|RELEASED HIDDEN AGENDA|hidden_agenda|only_if_asked|freely_given|opening_statement|release_when|release_rule|responds_to_(good|poor)|closing_behaviour|emotional_state|set_expression|\\call:|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   var DUMP_RE = /CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   function lineText(l) {
     var s = clean(l.text);
