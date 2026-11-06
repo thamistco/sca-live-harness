@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><title>SCA Live Harness</title>
+<style>body{font:14px system-ui;margin:16px;max-width:900px}input,button,select{font-size:14px;margin:4px 0}textarea{width:100%;height:320px;font:12px monospace}#log{white-space:pre-wrap;font:12px monospace;background:#f4f4f4;padding:8px;max-height:300px;overflow:auto}</style></head><body>
+<h1>SCA Live Harness</h1>
+<label>API key <input id="key" type="password" size="50" autocomplete="off"></label><br>
+<label>Model <input id="model" value="models/gemini-3.8-live" size="40"></label><br>
+<label>Tests file (.json) <input id="file" type="file" accept=".json,application/json"></label><br>
+<label>Input mode <select id="mode"><option value="text">text</option><option value="audio">audio (uses turn audio if present)</option></select></label><br>
+<button id="run">Run all tests</button> <span id="status">idle</span>
+<h3>Log</h3><div id="log"></div>
+<h3>Results (JSON)</h3><textarea id="out" readonly></textarea>
+<h3>Summary</h3><pre id="summary"></pre>
+<script>
+(function(){
+var WS="wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=";
+var $=function(i){return document.getElementById(i)};
+var TESTS=null;
+function log(s){$("log").textContent+=new Date().toISOString().slice(11,19)+" "+s+"\n";$("log").scrollTop=1e9}
+$("file").addEventListener("change",function(e){var f=e.target.files[0];if(!f)return;f.text().then(function(t){try{TESTS=JSON.parse(t);log("Loaded "+TESTS.length+" tests")}catch(err){log("Bad JSON: "+err)}})});
+function b64(u8){var s="";for(var i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s)}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function runTest(t,key,model,mode){return new Promise(function(resolve){
+  var res={id:t.id,model:model,mode:mode,setup_ok:false,turns:[],close:null,errors:[]};
+  var ws=new WebSocket(WS+encodeURIComponent(key)); ws.binaryType="arraybuffer";
+  var cur=null,waiter=null,done=false;
+  function finish(){if(done)return;done=true;try{ws.close()}catch(e){}resolve(res)}
+  ws.onopen=function(){var setup={model:model,generationConfig:{responseModalities:["AUDIO"],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:t.voice||"Kore"}}}},systemInstruction:{parts:[{text:t.system}]},inputAudioTranscription:{},outputAudioTranscription:{}};
+    if(t.expressions&&t.expressions.length)setup.tools=[{functionDeclarations:[{name:"set_expression",description:"Change the patient's visible facial expression",parameters:{type:"OBJECT",properties:{expression:{type:"STRING",enum:t.expressions}},required:["expression"]}}]}];
+    ws.send(JSON.stringify({setup:setup}))};
+  ws.onmessage=function(ev){var txt=typeof ev.data==="string"?ev.data:new TextDecoder().decode(ev.data),m;try{m=JSON.parse(txt)}catch(e){return}
+    if(m.setupComplete){res.setup_ok=true;if(waiter){var w=waiter;waiter=null;w()}}
+    if(m.error)res.errors.push(JSON.stringify(m.error).slice(0,400));
+    var sc=m.serverContent;
+    if(sc&&cur){if(sc.outputTranscription&&sc.outputTranscription.text)cur.reply+=sc.outputTranscription.text;
+      if(sc.inputTranscription&&sc.inputTranscription.text)cur.heard+=sc.inputTranscription.text;
+      if(sc.modelTurn&&sc.modelTurn.parts)sc.modelTurn.parts.forEach(function(p){if(p.text)cur.text_parts+=p.text;if(p.inlineData)cur.audio_chunks++});
+      ["finishReason","blockReason"].forEach(function(k){if(sc[k])cur.flags.push(k+":"+sc[k])});
+      if(sc.interrupted)cur.flags.push("interrupted");
+      if(sc.turnComplete){cur.complete=true;if(waiter){var w2=waiter;waiter=null;w2()}}}
+    if(m.toolCall&&m.toolCall.functionCalls){var r=m.toolCall.functionCalls.map(function(fc){if(cur)cur.tools.push(fc.name+"("+JSON.stringify(fc.args)+")");return{id:fc.id,name:fc.name,response:{result:"ok"}}});ws.send(JSON.stringify({toolResponse:{functionResponses:r}}))}
+    if(m.goAway&&cur)cur.flags.push("goAway")};
+  ws.onclose=function(ev){res.close={code:ev.code,reason:ev.reason};log(t.id+" closed "+ev.code+" "+ev.reason);if(waiter){var w=waiter;waiter=null;w()}finish()};
+  ws.onerror=function(){res.errors.push("ws error")};
+  function wait(ms){return new Promise(function(r){var to=setTimeout(function(){waiter=null;r("timeout")},ms);waiter=function(){clearTimeout(to);r("ok")}})}
+  (async function(){
+    var s=await wait(20000); if(!res.setup_ok){res.errors.push("no setupComplete ("+s+")");finish();return}
+    log(t.id+" setup ok");
+    for(var i=0;i<t.turns.length;i++){
+      if(done)break;
+      var turn=t.turns[i],text=typeof turn==="string"?turn:turn.text;
+      cur={n:i+1,doctor:text,reply:"",heard:"",text_parts:"",audio_chunks:0,tools:[],flags:[],complete:false,ms:0};
+      res.turns.push(cur); var t0=Date.now();
+      if(mode==="audio"&&turn.audio){var raw=Uint8Array.from(atob(turn.audio),function(c){return c.charCodeAt(0)});
+        for(var o=0;o<raw.length;o+=3200){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(raw.subarray(o,o+3200)),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
+        var sil=new Uint8Array(3200);for(var k=0;k<20;k++){if(done)break;ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(sil),mimeType:"audio/pcm;rate=16000"}}}));await sleep(100)}
+      } else ws.send(JSON.stringify({realtimeInput:{text:text}}));
+      var r=await wait(45000); cur.ms=Date.now()-t0; if(r==="timeout")cur.flags.push("timeout");
+      // let trailing transcription arrive
+      await sleep(600);
+      log(t.id+" turn "+(i+1)+" "+(cur.complete?"done":"INCOMPLETE")+" "+cur.ms+"ms");
+      await sleep(400);
+    }
+    finish();
+  })();
+})}
+$("run").addEventListener("click",async function(){
+  var key=$("key").value.trim(),model=$("model").value.trim(),mode=$("mode").value;
+  if(!key||!TESTS){log("Need key and tests file");return}
+  $("status").textContent="running"; var all=[];
+  for(var i=0;i<TESTS.length;i++){log("Starting "+TESTS[i].id);var r=await runTest(TESTS[i],key,model,mode);all.push(r);
+    $("out").value=JSON.stringify(all,null,1);await sleep(1500)}
+  var sum=all.map(function(r){var inc=r.turns.filter(function(t){return!t.complete}).length;return r.id+": setup="+r.setup_ok+" turns="+r.turns.length+" incomplete="+inc+" close="+(r.close?r.close.code+" "+r.close.reason:"-")+" errors="+r.errors.length}).join("\n");
+  $("summary").textContent=sum+"\nALL DONE"; $("status").textContent="done"; log("ALL DONE");
+});
+})();
+</script></body></html>
