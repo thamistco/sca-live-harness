@@ -820,7 +820,7 @@
         if (S.extra && !S.decided) {
           // Second completion with no doctor input since the last reply (usually after a face change).
           S.extraTx += piece;
-          if (DISCLAIMER_RE.test(S.extraTx) || LEAK_RE.test(S.extraTx) || dupOf(S.extraTx, S.lastReply)) {
+          if (DISCLAIMER_RE.test(S.extraTx) || LEAK_RE.test(S.extraTx) || dupOf(S.extraTx, S.lastReply) || /^\s*no,? i think that'?s it\.?\s*$/i.test(S.lastReply || "")) {
             S.decided = true; S.muteTurn = true; S.pend = []; console.warn("duplicate/disclaimer suppressed");
           } else if (normWords(S.extraTx).length >= 8) {
             S.decided = true; addTx("Patient", S.extraTx); S.pend.forEach(playPcm); S.pend = [];
