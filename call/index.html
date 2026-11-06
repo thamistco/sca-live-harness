@@ -809,19 +809,37 @@
     var sc = m.serverContent;
     if (sc) {
       if (sc.interrupted) stopPlayback();
-      if (sc.inputTranscription && sc.inputTranscription.text) addTx("Doctor", sc.inputTranscription.text);
+      if (sc.inputTranscription && sc.inputTranscription.text) { S.docSince = true; addTx("Doctor", sc.inputTranscription.text); }
       if (sc.outputTranscription && sc.outputTranscription.text) {
-        addTx("Patient", sc.outputTranscription.text);
+        var piece = sc.outputTranscription.text;
+        if (!S.turnTx) { S.extra = !S.docSince && !!S.lastReply; S.decided = !S.extra; S.pend = []; S.extraTx = ""; }
+        S.turnTx = (S.turnTx || "") + piece;
+        if (S.extra && !S.decided) {
+          // Second completion with no doctor input since the last reply (usually after a face change).
+          S.extraTx += piece;
+          if (DISCLAIMER_RE.test(S.extraTx) || LEAK_RE.test(S.extraTx) || dupOf(S.extraTx, S.lastReply)) {
+            S.decided = true; S.muteTurn = true; S.pend = []; console.warn("duplicate/disclaimer suppressed");
+          } else if (normWords(S.extraTx).length >= 8) {
+            S.decided = true; addTx("Patient", S.extraTx); S.pend.forEach(playPcm); S.pend = [];
+          }
+        } else if (!S.muteTurn) {
+          addTx("Patient", piece);
+        }
         // Live audio guard: mute the rest of a turn whose transcription leaks prompt/thoughts/tool syntax.
-        S.turnTx = (S.turnTx || "") + sc.outputTranscription.text;
         if (!S.muteTurn && (LEAK_RE.test(S.turnTx) || GARBAGE_RE.test(S.turnTx))) {
           S.muteTurn = true; stopPlayback(); console.warn("leak suppressed");
         }
       }
       if (sc.modelTurn && sc.modelTurn.parts && !S.muteTurn) sc.modelTurn.parts.forEach(function (p) {
-        if (p.inlineData && p.inlineData.data && /audio/.test(p.inlineData.mimeType || "audio")) playPcm(p.inlineData.data);
+        if (p.inlineData && p.inlineData.data && /audio/.test(p.inlineData.mimeType || "audio")) {
+          if (S.extra && !S.decided) S.pend.push(p.inlineData.data); else playPcm(p.inlineData.data);
+        }
       });
-      if (sc.turnComplete || sc.interrupted) { S.turnTx = ""; S.muteTurn = false; }
+      if (sc.turnComplete || sc.interrupted) {
+        if (S.extra && !S.decided && S.extraTx && !S.muteTurn) { addTx("Patient", S.extraTx); S.pend.forEach(playPcm); }
+        if (S.turnTx && !S.muteTurn) { S.lastReply = S.extra ? (S.lastReply + " " + S.turnTx) : S.turnTx; S.docSince = false; }
+        S.turnTx = ""; S.muteTurn = false; S.extra = false; S.decided = true; S.pend = []; S.extraTx = "";
+      }
     }
     if (m.toolCall && m.toolCall.functionCalls) {
       var responses = m.toolCall.functionCalls.map(function (fc) {
@@ -941,8 +959,15 @@
   /* Transcript */
   function addTx(who, text) {
     var t = fmt(elapsed()), last = S.tx[S.tx.length - 1];
-    if (last && last.who === who && !last.typed) last.text += text; else S.tx.push({ who: who, t: t, text: text });
+    if (last && last.who === who && !last.typed) last.text += (/[.!?\u2026]$/.test(last.text) && /^[A-Z\u2018\u201c"]/.test(text) ? " " : "") + text; else S.tx.push({ who: who, t: t, text: text });
     renderLiveTx();
+  }
+  function normWords(s) { return (s || "").toLowerCase().replace(/[\u2018\u2019\u201b`]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean); }
+  function dupOf(a, b) {
+    var x = normWords(a), y = normWords(b); if (x.length < 3 || !y.length) return false;
+    var set = {}; y.forEach(function (w) { set[w] = 1; });
+    var hit = x.filter(function (w) { return set[w]; }).length;
+    return hit / x.length >= 0.8;
   }
   function clean(s) { return s.replace(/\s+/g, " ").trim(); }
   var DISCLAIMER_RE = /not (intended as )?medical advice|not medical advice or diagnosis|seek (medical )?care|please (see|consult) a (healthcare|medical) professional|consult a healthcare professional|as an AI|educational purposes|medical advice (or|and) diagnosis (is|are) not provided|seek care from a (healthcare|health care|medical) professional/i;
@@ -1031,6 +1056,7 @@
     if (!value) return;
     var ws = S.ws;
     if (!ws || !ws._ready || ws.readyState !== 1) { toast("Not connected yet. Send again in a moment."); return; }
+    S.docSince = true;
     ws.send(JSON.stringify({ realtimeInput: { text: value } }));
     S.tx.push({ who: "Doctor", t: fmt(elapsed()), text: value, typed: true });
     renderLiveTx();
