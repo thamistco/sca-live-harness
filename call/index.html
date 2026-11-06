@@ -708,6 +708,9 @@
   }
   function setExpression(ex) {
     var imgs = S.faceImgs || {}, target = imgs[ex];
+    if (!target) { var near = { worried: ["tearful","frustrated","defensive","flat"], tearful: ["worried","flat"], flat: ["tearful","worried"], frustrated: ["defensive","worried"], defensive: ["frustrated","flat"], anxious: ["worried","tearful"], angry: ["frustrated","defensive"] }[ex] || [];
+      for (var i = 0; i < near.length && !target; i++) target = imgs[near[i]];
+      target = target || imgs.neutral; }
     if (!target) return false;
     Object.keys(imgs).forEach(function (k) { imgs[k].classList.toggle("is-on", imgs[k] === target); });
     return true;
