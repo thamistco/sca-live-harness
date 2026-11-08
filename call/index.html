@@ -739,7 +739,7 @@
     A.out.resume(); A.inp.resume();
     A.analyser = A.out.createAnalyser(); A.analyser.fftSize = 1024; A.analyser.connect(A.out.destination);
     A.sources = new Set(); A.nextT = 0;
-    S.tx = []; S.callStart = 0; S.ended = false; S.warned = false; S.endReason = ""; S.muted = false; S.model = MODEL; S.triedFallback = false; S.hasConnected = false; S.pendingRecap = null;
+    S.tx = []; S.langRetries = 0; S.callStart = 0; S.ended = false; S.warned = false; S.endReason = ""; S.muted = false; S.model = MODEL; S.triedFallback = false; S.hasConnected = false; S.pendingRecap = null;
     $("mute").setAttribute("aria-pressed", "false"); $("mute-label").textContent = "Mute";
     setTypeBox(false); $("type-note").hidden = true; $("type-input").value = "";
     buildStage();
@@ -842,6 +842,11 @@
           }
         } else if (!S.muteTurn) {
           addTx("Patient", piece);
+        }
+        // Language guard: a reply that drifts out of English is muted and redone in English.
+        if (!S.muteTurn && FOREIGN_RE.test(" " + S.turnTx + " ") && (S.langRetries || 0) < 2) {
+          S.muteTurn = true; stopPlayback(); S.langRetries = (S.langRetries || 0) + 1; console.warn("non-English reply suppressed");
+          try { S.ws.send(JSON.stringify({ realtimeInput: { text: "(Please say that again in English. Keep speaking English for the rest of the call.)" } })); } catch (e) {}
         }
         // Live audio guard: mute the rest of a turn whose transcription leaks prompt/thoughts/tool syntax.
         if (!S.muteTurn && (LEAK_RE.test(S.turnTx) || GARBAGE_RE.test(S.turnTx))) {
@@ -997,6 +1002,7 @@
   var SENT_RE = /[^.!?]+(?:[.!?]+["')\u201d\u2019]*|$)/g;
   var DOT = "\u2024", DOT_RE = /\u2024/g;
   var GARBAGE_RE = /```|`[^`]+`|\\[a-zA-Z]+\{|\bEOF\b|\.(py|sh|js|ts|json)\b|\b\w+_\w+\(|__\w+__|\btool\b.*\b(edit|run|call)|run_tests|\bbash\b/;
+  var FOREIGN_RE = /[¿¡ñáéíóú]|\s(que|qué|está|estoy|pero|porque|usted|gracias|hola|señor|bien|cómo|estás|tengo|muy|también|ahora|sí|nada|eso|esto|dolor|pasa)[\s,.?!]/i;
   var LEAK_RE = /(^|\s)---(\s|$)|\bthe user\b|\bdisclaimer\b|shift in health risk|thought The user|\bthe user (asked|said|is asking)\b|according to (the|my) instructions|maintaining my character|\bin character\b|CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|ONE ITEM AT A TIME|RELEASED HIDDEN AGENDA|hidden_agenda|only_if_asked|freely_given|opening_statement|release_when|release_rule|responds_to_(good|poor)|closing_behaviour|emotional_state|set_expression|\\call:|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   var DUMP_RE = /CHARACTER SCRIPT|Speak ONLY as the character|STRICT RELEASE|"persona"\s*:|\{"[a-z_]+"\s*:/i;
   function lineText(l) {
