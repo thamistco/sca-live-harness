@@ -85,10 +85,11 @@
 
       /* Call */
       .x-call {
-        position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+        position: fixed; inset: 0; z-index: 30; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto;
         background: var(--hero-surface); color: var(--hero-text);
         padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
       }
+      .x-call > .x-top { grid-row: 1; } .x-call > .x-blockbar { grid-row: 2; } .x-call > .x-warnbar { grid-row: 3; } .x-call > .x-stage { grid-row: 4; } .x-call > .x-ctls { grid-row: 5; }
       .x-call :focus-visible { outline-color: var(--hero-text); }
       .x-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; }
       .x-top__case { min-width: 0; font: var(--type-small); color: var(--hero-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
