@@ -151,7 +151,7 @@
         padding: 16px 24px; border-radius: var(--r-l); background: var(--fill-system-red); color: var(--hero-text);
         font: var(--type-heading); box-shadow: var(--hark-shadow); white-space: nowrap;
       }
-      .x-ctls { display: flex; justify-content: center; gap: 22px; padding: 14px 16px 18px; }
+      .x-ctls { display: flex; justify-content: center; gap: 10px; padding: 14px 8px 18px; }
       .x-ctl { display: grid; justify-items: center; gap: 6px; font: var(--type-caption); color: var(--hero-text-muted); background: none; border: 0; padding: 0; cursor: pointer; }
       .x-ctl__b { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--hero-glass); border: 1px solid var(--hero-glass-stroke); color: var(--hero-text); transition: transform var(--dur-quick) var(--ease-out); }
       .x-ctl:active .x-ctl__b { transform: scale(0.94); }
@@ -347,6 +347,13 @@
             <svg class="off" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16" /></svg>
           </span>
           <span id="mute-label">Mute</span>
+        </button>
+        <button class="x-ctl" type="button" id="cam" aria-pressed="false" hidden>
+          <span class="x-ctl__b">
+            <svg class="on" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="13" height="10" rx="2" /><path d="M16 11l5-3v8l-5-3" /></svg>
+            <svg class="off" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="13" height="10" rx="2" /><path d="M16 11l5-3v8l-5-3M3 3l18 18" /></svg>
+          </span>
+          <span id="cam-label">Camera off</span>
         </button>
         <button class="x-ctl" type="button" id="tx-toggle" aria-pressed="false" aria-controls="tx">
           <span class="x-ctl__b"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 6h14M5 11h14M5 16h9" /></svg></span>
@@ -760,12 +767,9 @@
       setTypeBox(true);
       toast("Mic unavailable - type instead");
     }
-    if (S.c.mode !== "telephone") {
-      try {
-        A.cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } }, audio: false });
-        var v = $("self-video"); v.srcObject = A.cam; $("self").hidden = false; v.play().catch(function () {});
-      } catch (e) { A.cam = null; toast("Camera unavailable. Carrying on audio-only."); }
-    }
+    $("cam").hidden = S.c.mode === "telephone";
+    if (S.c.mode !== "telephone" && camWanted()) await camOn(true);
+    else setCamBtn();
     if (A.mic) try {
       var url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
       await A.inp.audioWorklet.addModule(url);
@@ -1101,6 +1105,24 @@
   });
 
   /* Controls */
+  // Self-view camera: local only, never sent anywhere. Choice is remembered on this device.
+  function camWanted() { try { return localStorage.getItem("sca_cam") !== "off"; } catch (e) { return true; } }
+  function setCamBtn() { var on = !!A.cam; $("cam").setAttribute("aria-pressed", String(!on)); $("cam-label").textContent = on ? "Camera off" : "Camera on"; }
+  async function camOn(quiet) {
+    try {
+      A.cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 640 } }, audio: false });
+      var v = $("self-video"); v.srcObject = A.cam; $("self").hidden = false; v.play().catch(function () {});
+    } catch (e) { A.cam = null; toast(quiet ? "Camera unavailable. Carrying on audio-only." : "Camera unavailable."); }
+    setCamBtn();
+  }
+  function camOff() {
+    if (A.cam) A.cam.getTracks().forEach(function (t) { t.stop(); });
+    A.cam = null; $("self-video").srcObject = null; $("self").hidden = true; setCamBtn();
+  }
+  $("cam").addEventListener("click", function () {
+    if (A.cam) { camOff(); try { localStorage.setItem("sca_cam", "off"); } catch (e) {} }
+    else { try { localStorage.setItem("sca_cam", "on"); } catch (e) {} camOn(false); }
+  });
   $("mute").addEventListener("click", function () {
     S.muted = !S.muted;
     if (A.mic) A.mic.getAudioTracks().forEach(function (t) { t.enabled = !S.muted; });
