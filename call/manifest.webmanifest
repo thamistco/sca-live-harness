@@ -1,0 +1,17 @@
+{
+  "name": "SCA Live Call",
+  "short_name": "SCA Call",
+  "description": "MRCGP SCA practice: live voice and video consultations with simulated patients.",
+  "id": "/sca-live-harness/call/",
+  "start_url": "/sca-live-harness/call/",
+  "scope": "/sca-live-harness/call/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#152640",
+  "theme_color": "#152640",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

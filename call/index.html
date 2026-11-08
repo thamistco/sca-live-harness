@@ -199,7 +199,12 @@
         .x-facewrap img { transition: none; }
       }
     </style>
-  </head>
+      <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#152640" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <script>if ("serviceWorker" in navigator) addEventListener("load", function () { navigator.serviceWorker.register("sw.js"); });</script>
+</head>
   <body>
     <div class="page x-app" id="top">
       <main class="main">
