@@ -707,6 +707,20 @@
     }
     $("self").hidden = true;
   }
+  // Fallback when the model speaks without calling set_expression (common in voice mode): read the feeling from her words.
+  var FACE_CUES = [
+    ["in_pain", /\b(hurts?|hurting|agony|so painful|the pain|ouch|killing me)\b/i],
+    ["tearful", /\b(cry|crying|tears|can'?t cope|end of my tether|can'?t take|breaking down|falling apart|so hard|lost (him|her)|passed away|died)\b/i],
+    ["frustrated", /\b(fed up|annoy|ridiculous|again\?|waste of|nobody listens|not fair|keep being told|sick of|why can'?t)\b/i],
+    ["defensive", /\b(i'?m fine|it'?s fine|not a problem|nothing wrong|none of your|why do you need|what'?s that got to do|i don'?t drink that much|i'?m not)\b/i],
+    ["worried", /\b(worr|scared|afraid|frighten|nervous|anxious|concern|cancer|serious|what if|dying|tumou?r|terrified)\b/i],
+    ["relieved", /\b(relief|relieved|that'?s good|that'?s great|thank (you|god)|thanks|brilliant|reassur|makes sense|that helps|ok,? good)\b/i],
+    ["flat", /\b(don'?t know|no point|nothing really|can'?t be bothered|whatever|numb|empty|exhausted)\b/i]
+  ];
+  function guessFace(text) {
+    var exs = (S.c && S.c.expressions) || []; if (!exs.length || !S.faceImgs) return;
+    for (var i = 0; i < FACE_CUES.length; i++) if (exs.indexOf(FACE_CUES[i][0]) >= 0 && FACE_CUES[i][1].test(text)) { setExpression(FACE_CUES[i][0]); return; }
+  }
   function setExpression(ex) {
     var imgs = S.faceImgs || {}, target = imgs[ex];
     if (!target) { var near = { worried: ["tearful","frustrated","defensive","flat"], tearful: ["worried","flat"], flat: ["tearful","worried"], frustrated: ["defensive","worried"], defensive: ["frustrated","flat"], anxious: ["worried","tearful"], angry: ["frustrated","defensive"] }[ex] || [];
@@ -840,6 +854,8 @@
         }
       });
       if (sc.turnComplete || sc.interrupted) {
+        if (S.turnTx && !S.muteTurn && !S.faceByTool) guessFace(S.turnTx);
+        S.faceByTool = false;
         if (S.extra && !S.decided && S.extraTx && !S.muteTurn) { addTx("Patient", S.extraTx); S.pend.forEach(playPcm); }
         if (S.turnTx && !S.muteTurn) { S.lastReply = S.extra ? (S.lastReply + " " + S.turnTx) : S.turnTx; S.docSince = false; }
         S.turnTx = ""; S.muteTurn = false; S.extra = false; S.decided = true; S.pend = []; S.extraTx = "";
@@ -850,6 +866,7 @@
       if (S.turnTx && !S.muteTurn && !S.extra) { S.lastReply = S.turnTx; S.turnTx = ""; S.docSince = false; S.afterTool = true; }
       var responses = m.toolCall.functionCalls.map(function (fc) {
         var ok = fc.name === "set_expression" && setExpression(fc.args && fc.args.expression);
+        if (ok) S.faceByTool = true;
         return { id: fc.id, name: fc.name, response: { result: ok ? "ok" : "unknown expression" } };
       });
       ws.send(JSON.stringify({ toolResponse: { functionResponses: responses } }));
